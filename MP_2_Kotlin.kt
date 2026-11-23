@@ -179,12 +179,29 @@ fun register()
     }
 }
 
+fun removeDuplicateAccountNumbers(): List<String>
+{
+    val accountNumbers = mutableListOf<String>()
+    for (t in transactionList)
+    {
+        if (!accountNumbers.contains(t.number))
+        {
+            accountNumbers.add(t.number)
+        }
+    }
+
+    return accountNumbers
+}
+
 fun report1()
 {
     println(divider)
     println(" ~~~ Report 1: Banking Privilege Tiers")
     println(divider)
 
+
+    val out = File("report1_banking_privilege_tiers.csv")
+    out.writeText("account_name,account_age,current_balance,average_daily_balance,privilege_tier\n")
     data class reportEntry (
         val name: String,
         val age: Long,
@@ -193,19 +210,68 @@ fun report1()
         val tier: String
     )
 
-    val lastDate = transactionList.last().date
-    val year = lastDate.year
-    val month = lastDate.monthValue
-    val daysInMonth = lastDate.lengthOfMonth()
+    val accountNumbers = removeDuplicateAccountNumbers()
+    val date = LocalDate.now().minusMonths(1) //last month
+    val year = date.year
+    val month = date.monthValue
+    val daysInMonth = date.lengthOfMonth()
+    val entries = mutableListOf<reportEntry>()
 
-    for (transaction in transactionList)
+    for (accountNumber in accountNumbers)
     {
-        if (transaction.date.year == year && transaction.date.monthValue == month)
+        //default valuess before hanapin ung account number
+        var name = ""
+        var opened = monthEnd
+        var currentBalance = 0.0
+        var finalCurrentBalance = 0.0
+        var tier = "None"
+
+        for (t in transactionList)
         {
-            ... //di ko gets lemme wait for yall
+            if (t.number == accountNumber && t.currency == "PHP") //find in the list
+            {
+                name = t.name
+                opened = t.date
+                age = java.time.temporal.ChronoUnit.DAYS.between(opened, LocalDate.now())
+                
+                var totalBalance = 0.0
+                for (day in 1..daysInMonth)
+                {
+                    val dayEnd = date.withDayOfMonth(day)
+                    for (transaction in transactionList) // scan buong month history
+                    {
+                        if (transaction.number == accountNumber &&
+                            transaction.currency == "PHP" &&
+                            transaction.date.isBefore(dayEnd))
+                        {
+                            currentBalance = transaction.balance
+                            finalCurrentBalance = currentBalance // update the balance for the day
+                        }
+                    }
+                    totalBalance += currentBalance
+                }
+                val averageDailyBalance = totalBalance / daysInMonth
+
+                if (averageDailyBalance >= 100000)
+                {
+                    when (averageDailyBalance)
+                    {
+                        in 100000.0..499999.99 -> tier = "Silver"
+                        in 500000.0..999999.99 -> tier = "Gold"
+                        else -> tier = "Platinum"
+                    }
+
+                    entries.add(reportEntry(name, age, finalCurrentBalance, averageDailyBalance, tier))
+                }
+            }
         }
     }
 
+    val sortedEntries = entries.sortedByDescending { it.averageDailyBalance }
+    for (entry in sortedEntries)
+    {
+        out.appendText("${entry.name},${entry.age},${"%,.2f".format(entry.balance)},${"%,.2f".format(entry.ave)},${entry.tier}\n")
+    }
 }
 
 fun report2()
@@ -269,24 +335,39 @@ fun deposit()
     {
         return    // account not found, back to the main menu
     }
-    val account = transactionList[index]
-
-    println("Account Name: ${account.name}")
-    println("Current Balance: PHP ${"%,.2f".format(account.balance)}")
+    var account = transactionList[index]
 
     while (true)
     {
-        print("Enter deposit amount: ")
-        val amount = readLine().trim().toDoubleOrNull()
-        if (amount == null || amount <= 0)
+        println("Account Name: ${account.name}")
+        println("Current Balance: PHP ${"%,.2f".format(account.balance)}")
+
+        while (true)
         {
-            println("Enter a valid amount greater than 0.")
-            continue
+            print("Enter deposit amount: ")
+            val amount = readLine().trim().toDoubleOrNull()
+            if (amount == null || amount <= 0)
+            {
+                println("Enter a valid amount greater than 0.")
+                continue
+            }
+
+            val newBalance = addTransaction(account, amount, "deposit")
+            println("Deposit successful. New balance: PHP ${"%,.2f".format(newBalance)}")
+            account = transactionList[findAccount(account.number)]
+            break
         }
 
-        val newBalance = addTransaction(account, amount, "deposit")
-        println("Deposit successful. New balance: PHP ${"%,.2f".format(newBalance)}")
-        break
+        while (true)
+        {
+            print("Deposit another amount (Y/N): ")
+            when (readLine().trim().lowercase())
+            {
+                "y" -> break //exit this loop lang
+                "n" -> return //exit entire function
+                else -> println("Please enter Y or N.")
+            }
+        }
     }
 }
 
@@ -301,30 +382,45 @@ fun withdraw()
     {
         return
     }
-    val account = transactionList[index]
-
-    println("Account Name: ${account.name}")
-    println("Current Balance: PHP ${"%,.2f".format(account.balance)}")
+    var account = transactionList[index]
 
     while (true)
     {
-        print("Enter withdrawal amount: ")
-        val amount = readLine().trim().toDoubleOrNull()
-        if (amount == null || amount <= 0)
+        println("Account Name: ${account.name}")
+        println("Current Balance: PHP ${"%,.2f".format(account.balance)}")
+
+        while (true)
         {
-            println("Enter a valid amount greater than 0.")
-            continue
+            print("Enter withdrawal amount: ")
+            val amount = readLine().trim().toDoubleOrNull()
+            if (amount == null || amount <= 0)
+            {
+                println("Enter a valid amount greater than 0.")
+                continue
+            }
+
+            if (amount > account.balance)
+            {
+                println("Insufficient balance. Enter a smaller amount.")
+                continue
+            }
+
+            val newBalance = addTransaction(account, amount, "withdrawal")
+            println("Withdrawal successful. New balance: PHP ${"%,.2f".format(newBalance)}")
+            account = transactionList[findAccount(account.number)]
+            break
         }
 
-        if (amount > account.balance)
+        while (true)
         {
-            println("Insufficient balance. Enter a smaller amount.")
-            continue
+            print("Withdraw another amount (Y/N): ")
+            when (readLine().trim().lowercase())
+            {
+                "y" -> break //exit this loop lang
+                "n" -> return
+                else -> println("Please enter Y or N.")
+            }
         }
-
-        val newBalance = addTransaction(account, amount, "withdrawal")
-        println("Withdrawal successful. New balance: PHP ${"%,.2f".format(newBalance)}")
-        break
     }
 }
 
@@ -585,7 +681,7 @@ fun main()
             "5" -> recordExchange()
             "6" -> showInterest()
             "7" -> generateReports()
-            else -> println("Invalid choice. Please enter 0 to 7.")
+            else -> println("Invalid choice. Please enter 1 to 7.")
         }
 
         if (!backToMainMenu())
