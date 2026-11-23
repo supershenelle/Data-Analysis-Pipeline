@@ -153,7 +153,7 @@ fun register()
         }
 
         val date = LocalDate.now()
-        val time = LocalTime.now()
+        val time = LocalTime.now().withNano(0) // remove nanoseconds for consistency
         val dateFormatted = date.format(dateFormat)
         val timeFormatted = time.format(timeFormat)
 
@@ -264,12 +264,19 @@ fun deposit()
     println(divider)
 
     val index = askAccount()
+    if (index == -1)
+    {
+        return    // account not found, back to the main menu
+    }
     val account = transactionList[index]
+
+    println("Account Name: ${account.name}")
+    println("Current Balance: PHP ${"%,.2f".format(account.balance)}")
 
     while (true)
     {
         print("Enter deposit amount: ")
-        val amount = readLine()!!.trim().toDoubleOrNull()
+        val amount = readLine().trim().toDoubleOrNull()
         if (amount == null || amount <= 0)
         {
             println("Enter a valid amount greater than 0.")
@@ -277,7 +284,7 @@ fun deposit()
         }
 
         val newBalance = addTransaction(account, amount, "deposit")
-        println("Deposit successful. New balance: PHP $newBalance")
+        println("Deposit successful. New balance: PHP ${"%,.2f".format(newBalance)}")
         break
     }
 }
@@ -289,12 +296,19 @@ fun withdraw()
     println(divider)
 
     val index = askAccount()
+    if (index == -1)
+    {
+        return
+    }
     val account = transactionList[index]
+
+    println("Account Name: ${account.name}")
+    println("Current Balance: PHP ${"%,.2f".format(account.balance)}")
 
     while (true)
     {
         print("Enter withdrawal amount: ")
-        val amount = readLine()!!.trim().toDoubleOrNull()
+        val amount = readLine().trim().toDoubleOrNull()
         if (amount == null || amount <= 0)
         {
             println("Enter a valid amount greater than 0.")
@@ -303,12 +317,12 @@ fun withdraw()
 
         if (amount > account.balance)
         {
-            println("Insufficient balance. Available balance: PHP ${account.balance}")
+            println("Insufficient balance. Enter a smaller amount.")
             continue
         }
 
-        val newBalance = addTransaction(account, amount, "withdraw")
-        println("Withdrawal successful. New balance: PHP $newBalance")
+        val newBalance = addTransaction(account, amount, "withdrawal")
+        println("Withdrawal successful. New balance: PHP ${"%,.2f".format(newBalance)}")
         break
     }
 }
