@@ -261,7 +261,7 @@ fun askAccount(): Int
 fun deposit()
 {
     println(divider)
-    println(" ~~~ Deposit")
+    println(" ~~~ Deposit Amount")
     println(divider)
 
     val index = askAccount()
@@ -293,7 +293,7 @@ fun deposit()
 fun withdraw()
 {
     println(divider)
-    println(" ~~~ Withdraw")
+    println(" ~~~ Withdraw Amount")
     println(divider)
 
     val index = askAccount()
@@ -373,7 +373,10 @@ fun currencyExchange()
 
     while (true) // para magrestart loop kung may error sa input
     {
-        println("[FOREIGN CURRENCY EXCHANGE]")
+        println(divider)
+        println(" ~~~ Currency Exchange")
+        println(divider)
+        
         println("Source Currency Option:")
         println("[1] Philippine Peso (PHP)")
         println("[2] United States Dollar (USD)")
@@ -446,7 +449,9 @@ fun currencyExchange()
 
 fun recordExchange()
 {
-    println("[RECORD EXCHANGE RATE]\n")
+    println(divider)
+    println(" ~~~ Record Exchange Rates")
+    println(divider)
 
     println("[1] Philippine Peso (PHP)")
     println("[2] United States Dollar (USD)")
@@ -484,6 +489,52 @@ fun recordExchange()
         currencyRates[choice - 1] = rate // set the new exchange rate
         println("Exchange rate recorded successfully.")
         return
+    }
+}
+
+fun showInterest()
+{
+    println(divider)
+    println(" ~~~ Show Interest Amount")
+    println(divider)
+
+    // ask for the account number and check that it exists in the CSV
+    val index = askAccount()
+    if (index == -1)
+    {
+        return    // not found, back to the main menu
+    }
+    val account = transactionList[index]
+
+    println("Account Name: ${account.name}")
+    println("Current Balance: ${"%,.2f".format(account.balance)}")
+    println("Currency: PHP")
+    println("Interest Rate: 5%")
+
+    // ask for the number of days until it's a valid whole number above 0
+    val days: Int
+    while (true)
+    {
+        print("Total Number of Days: ")
+        val input = readln().trim().toIntOrNull()
+
+        if (input == null || input <= 0)
+        {
+            println("Error: Number of days must be a whole number greater than zero.")
+            continue
+        }
+        days = input
+        break
+    }
+
+    var newBalance = account.balance
+    println("\n| Day |     Interest |          Balance |")
+    for (i in 1..days)
+    {
+        val interest = account.balance * 0.05 / 365
+        newBalance += interest
+
+        println("| ${"%3d".format(i)} | ${"%,12.2f".format(interest)} | ${"%,16.2f".format(newBalance)} |")
     }
 }
 
