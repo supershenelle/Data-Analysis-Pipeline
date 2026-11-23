@@ -22,6 +22,7 @@ data class transactions (
     val balance: Double
 )
 
+val currencyRates = arrayOfNulls<Double>(6)
 val dateFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 val timeFormat = DateTimeFormatter.ofPattern("H:mm:ss")
 val divider = "_____________________________________________"
@@ -359,6 +360,133 @@ fun addTransaction(account: transactions, amount: Double, type: String): Double
     return newBalance
 }
 
+fun currencyExchange()
+{
+    val currencyNames = arrayOf(
+        "Philippine Peso (PHP)",
+        "United States Dollar (USD)",
+        "Japanese Yen (JPY)",
+        "British Pound Sterling (GBP)",
+        "Euro (EUR)",
+        "Chinese Yuan Renminbi (CNY)"
+    )
+
+    while (true) // para magrestart loop kung may error sa input
+    {
+        println("[FOREIGN CURRENCY EXCHANGE]")
+        println("Source Currency Option:")
+        println("[1] Philippine Peso (PHP)")
+        println("[2] United States Dollar (USD)")
+        println("[3] Japanese Yen (JPY)")
+        println("[4] British Pound Sterling (GBP)")
+        println("[5] Euro (EUR)")
+        println("[6] Chinese Yuan Renminbi (CNY)")
+
+        print("\nSource Currency: ")
+        val sourceCurrency = readln().toInt()
+        if (sourceCurrency !in 1..6)
+        {
+            println("Error: Invalid source currency.")
+            continue
+        }
+
+        print("Source Amount: ")
+        val sourceAmount = readln().toDouble()
+
+        println("\nExchanged Currency Options:")
+        println("[1] Philippine Peso (PHP)")
+        println("[2] United States Dollar (USD)")
+        println("[3] Japanese Yen (JPY)")
+        println("[4] British Pound Sterling (GBP)")
+        println("[5] Euro (EUR)")
+        println("[6] Chinese Yuan Renminbi (CNY)")
+
+        print("\nExchange Currency: ")
+        val exchangeCurrency = readln().toInt()
+        if (exchangeCurrency !in 1..6)
+        {
+            println("Error: Invalid exchange currency.")
+            continue
+        }
+
+        // formulas and values para sa exchange
+        val sourceName = currencyNames[sourceCurrency - 1]
+        val exchangeName = currencyNames[exchangeCurrency - 1]
+        val sourceRate = currencyRates[sourceCurrency - 1]
+        val exchangeRate = currencyRates[exchangeCurrency - 1]
+
+        if (sourceRate == null)
+            println("Error: No rate set for ${currencyNames[sourceCurrency - 1]}")
+
+        if (exchangeRate == null)
+            println("Error: No rate set for ${currencyNames[exchangeCurrency - 1]}")
+        
+
+        if (sourceRate == null || exchangeRate == null)
+        {
+            print("\nConvert another currency (Y/N)? ")
+            
+            if (readln().trim().lowercase() != "y")
+                return // stop function
+
+            else
+                continue // start again from the top of the loop
+        }
+
+        val exchangeAmount = sourceAmount * sourceRate / exchangeRate // main output
+        println("Exchange Amount: ${String.format("%.2f", exchangeAmount)}")
+
+        print("\nConvert another currency (Y/N)? ")
+        if (readln().trim().lowercase() != "y")
+        {
+            return //stop function
+        }
+    }
+}
+
+fun recordExchange()
+{
+    println("[RECORD EXCHANGE RATE]\n")
+
+    println("[1] Philippine Peso (PHP)")
+    println("[2] United States Dollar (USD)")
+    println("[3] Japanese Yen (JPY)")
+    println("[4] British Pound Sterling (GBP)")
+    println("[5] Euro (EUR)")
+    println("[6] Chinese Yuan Renminni (CNY)\n")
+
+    print("Select Currency: ")
+    val choice = readln().trim().toIntOrNull()
+
+    if (choice == null || choice !in 1..6)
+    {
+        println("Error: Invalid choice.")
+        return
+    }
+
+    while (true)
+    {
+        print("Exchange Rate: ")
+        val rate = readln().trim().toDoubleOrNull()
+
+        if (rate == null)
+        {
+            println("Error: Exchange rate must be numerical.")
+            continue
+        }
+
+        if (!rate.isFinite() || rate <= 0)
+        {
+            println("Error: Exchange rate must be greater than zero.")
+            continue
+        }
+
+        currencyRates[choice - 1] = rate // set the new exchange rate
+        println("Exchange rate recorded successfully.")
+        return
+    }
+}
+
 fun backToMainMenu(): Boolean
 {
     while (true)
@@ -403,7 +531,7 @@ fun main()
             "2" -> deposit()
             "3" -> withdraw()
             "4" -> currencyExchange()
-            "5" -> recordRates()
+            "5" -> recordExchange()
             "6" -> showInterest()
             "7" -> generateReports()
             else -> println("Invalid choice. Please enter 0 to 7.")
