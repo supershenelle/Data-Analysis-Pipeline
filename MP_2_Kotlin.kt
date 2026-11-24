@@ -436,7 +436,73 @@ fun report3()
 
 fun report4()
 {
-    ...
+    println(divider)
+    println(" ~~~ Report 4: Monthly Transaction Summary")
+    println(divider)
+
+    val out = File("report4_monthly_transaction_summary.csv")
+    out.writeText("year,month,num_deposits,total_deposits,num_withdrawals,total_withdrawals,net_cash_flow\n")
+    
+    data class monthEntry (
+        val year: Int,
+        val month: Int,
+        var numDeposits: Int = 0,
+        var totalDeposits: Double = 0.0,
+        var numWithdrawals: Int = 0,
+        var totalWithdrawals: Double = 0.0
+    )
+
+    val months = mutableListOf<monthEntry>()
+
+    // add every transaction to its month's entry parang ung sa report3, pero ung sa report4 is per month lang
+    for (t in transactionList)
+    {
+        if (t.currency != "PHP")
+        {
+            continue
+        }
+
+        val year = t.date.year
+        val month = t.date.monthValue
+
+        // first transaction of a new month: start a new entry
+        if (months.isEmpty() || months.last().year != year || months.last().month != month)
+        {
+            months.add(monthEntry(year, month))
+        }
+
+        // the current month's entry is always the last one in the list
+        val entry = months.last()
+
+        if (t.type == "deposit")
+        {
+            entry.numDeposits = entry.numDeposits + 1
+            entry.totalDeposits = entry.totalDeposits + t.amount
+        }
+        else
+        {
+            entry.numWithdrawals = entry.numWithdrawals + 1
+            entry.totalWithdrawals = entry.totalWithdrawals + t.amount
+        }
+    }
+    
+    for (entry in months)
+    {
+        out.appendText("${entry.year},${entry.month},${entry.numDeposits},${"%,.2f".format(entry.totalDeposits)}," +
+                "${entry.numWithdrawals},${"%,.2f".format(entry.totalWithdrawals)}," +
+                "${"%,.2f".format(entry.totalDeposits - entry.totalWithdrawals)}\n")
+    }
+
+    for (i in 0 until minOf(2, months.size)) //incase there are less than 2 entries
+    {
+        val e = months[i]
+        println(e.year + " | " + e.month + " | " + e.numDeposits + " | " +
+                "%,.2f".format(e.totalDeposits) + " | " + e.numWithdrawals + " | " +
+                "%,.2f".format(e.totalWithdrawals) + " | " +
+                "%,.2f".format(e.totalDeposits - e.totalWithdrawals))
+    }
+    
+    println("\n~~~ Full table exported to report4_monthly_transaction_summary.csv")
 }
 
 fun findAccount(accountNumber: String): Int
