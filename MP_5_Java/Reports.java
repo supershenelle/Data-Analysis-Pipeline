@@ -13,8 +13,6 @@ import java.util.*;
 public class Reports{
 
     private LocalDate latestDate; // newest date sa file
-
-    private ArrayList<TransactionRecords.Transaction> rows; // the list of loaded rows
     private HashMap<Long, ArrayList<TransactionRecords.Transaction>> byAccount = new HashMap<>(); // hashmap that maps each account number to their list of transactions
 
     // records that represent a line in each respective report
@@ -30,7 +28,6 @@ public class Reports{
      * @param rows is an arraylist that represents each row of transactions found in the file
      */
     public Reports(ArrayList<TransactionRecords.Transaction> rows){
-        this.rows = rows;
 
         // gets the date in the first row
         latestDate = rows.get(0).date();

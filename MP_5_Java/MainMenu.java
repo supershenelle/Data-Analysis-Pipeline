@@ -16,8 +16,8 @@ import java.util.*;
  * and currency conversion to the ExchangeRate class.
  */
 public class MainMenu{
-    private Scanner sc = new Scanner(System.in);
     private Account account;
+    private Scanner sc = new Scanner(System.in);
     private ExchangeRate exchangeRate = new ExchangeRate();
     private ArrayList<Account> accounts = new ArrayList<>();
     private ArrayList<TransactionRecords.Transaction> transactions = new ArrayList<>();
@@ -254,10 +254,10 @@ public class MainMenu{
             System.out.print(prompt);
             String choice = sc.nextLine().trim().toUpperCase();
 
-            if(choice.equals("N") || choice.equals("n")){
+            if(choice.equals("N")){
                 return false;
             }
-            if(choice.equals("Y") || choice.equals("y")){
+            if(choice.equals("Y")){
                 return true;
             }
 
@@ -515,15 +515,7 @@ public class MainMenu{
      * @return the corresponding Currency.
      */
     public Currency choiceToCurrency(int choice){
-        switch(choice){
-            case 1: return Currency.PHP;
-            case 2: return Currency.USD;
-            case 3: return Currency.JPY;
-            case 4: return Currency.GBP;
-            case 5: return Currency.EUR;
-            case 6: return Currency.CNY;
-            default: return Currency.PHP;
-        }
+        return Currency.values()[choice-1];
     }
 
     /**
@@ -572,25 +564,8 @@ public class MainMenu{
                 System.out.printf("Exchange Amount: %.2f\n", exchangeRate.convert(sourceAmt, sourceCurr, exchangeCurr));
             }
 
-            boolean convertAgain = false;
             System.out.println();
-
-            // If user will convert again
-            while(!convertAgain){
-                System.out.print("Convert another currency (Y/N)? . . . ");
-                String choice = sc.nextLine().trim().toUpperCase();
-
-                if(choice.equals("Y")){
-                    willConvert = true;
-                    convertAgain = true;
-
-                } else if(choice.equals("N")){
-                    willConvert = false;
-                    convertAgain = true;
-                } else{
-                    System.out.println("Error: Invalid Choice");
-                }
-            }
+            willConvert = exit("Convert another currency (Y/N)? . . . ");
 
             if(willConvert){
                 clearScreen();
