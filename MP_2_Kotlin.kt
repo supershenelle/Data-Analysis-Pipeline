@@ -27,10 +27,11 @@ val dateFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 val timeFormat = DateTimeFormatter.ofPattern("H:mm:ss")
 val divider = "_____________________________________________"
 val transactionList = mutableListOf<transactions>() // create empty list na pwede maedit
+var fileLoaded = false
 
 fun readFile()
 {
-    val lines = File("bank_transactions.txt").readLines().drop(1) // lines[0]...
+    val lines = File("bank_transactions.csv").readLines().drop(1) // lines[0]...
 
     var invalid = 0
     for (line in lines)
@@ -94,6 +95,7 @@ fun readFile()
     println("Rows invalid: ${invalid}")
     println("Rows valid: ${transactionList.size}")
     println("Transactions in PHP: $phpCount")
+    fileLoaded = true
 }
 
 fun register()
@@ -852,6 +854,51 @@ fun showInterest()
     }
 }
 
+fun generate()
+{
+    if (!fileLoaded)
+    {
+        println("Error: Please load the transaction file before generating reports.")
+        return
+    }
+
+    println(divider)
+    println("~~~ Generating reports / outputting to CSV files...\n")
+
+    report1()
+    report2()
+    report3()
+    report4()
+}
+
+fun generateReports()
+{
+    while (true)
+    {
+        println(divider)
+        println(" ~~~ Generate Reports")
+        println(divider)
+
+        println("[1] Load File")
+        println("[2] Generate Reports")
+        print("Select Choice: ")
+
+        val choice = readln().trim()
+
+        when (choice)
+        {
+            "1" -> readFile()
+            "2" -> generate()
+            else -> println("Error: Invalid choice. Please enter 1 to 2.")
+        }
+
+        if (!backToMainMenu())
+        {
+            return
+        }
+    }
+}
+
 fun backToMainMenu(): Boolean
 {
     while (true)
@@ -885,7 +932,6 @@ fun main()
         println("[5] Record Exchange Rates")
         println("[6] Show Interest Amount")
         println("[7] Generate Reports")
-        println("[0] Exit")
         print("Enter choice: ")
 
         val choice = readLine()!!.trim()
