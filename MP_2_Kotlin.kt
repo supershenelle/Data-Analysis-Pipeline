@@ -347,7 +347,91 @@ fun report2()
 
 fun report3()
 {
-    ...
+    println(divider)
+    println(" ~~~ Report 3: Suspicious Client Behavior")
+    println(divider)
+
+    val out = File("report3_suspicious_client_behavior.csv")
+    out.writeText("account_name,current_balance,expected_interest\n")
+
+    data class dayEntry (
+        val name: String,
+        val date: LocalDate,
+        var totalWithdrawal: Double = 0.0,
+        var numDeposits: Int = 0,
+        var totalDeposit: Double = 0.0,
+        var turnover: Double = 0.0,
+        var flag: String = "Normal"
+    )
+
+    // one acc per day sa history so ccheck lahat ("1092000100" -> [ 01/12/2025 entry, 03/12/2025 entry, ... ])
+    val accountTransactions = mutableMapOf<String, MutableList<dayEntry>>() // key: account number, value: list of dayEntry
+    for (t in transactionList)
+    {
+        if (t.currency == "PHP")
+        {
+            var days = accountTransactions[t.number] // kunin ung values
+            if (days == null)
+            {
+                days = mutableListOf()
+                accountTransactions[t.number] = days //create new empty if wala pa
+            }
+
+            if (days.isEmpty() || days.last().date != t.date) // check if new day ba to
+            {
+                days.add(dayEntry(t.name, t.date)) // new day: add a fresh entry
+            }
+            val entry = days.last() //* */
+
+            if (t.type == "withdrawal")
+            {
+                entry.totalWithdrawal += t.amount
+            }
+            else if (t.type == "deposit")
+            {
+                entry.numDeposits++
+                entry.totalDeposit += t.amount
+            }
+        }
+    }
+
+    val entries = mutableListOf<dayEntry>()
+    for (days in accountTransactions.values)
+    {
+        for (e in days)
+        {
+            if (e.totalDeposit > 0)
+            {
+                e.turnover = e.totalWithdrawal / e.totalDeposit * 100
+            }
+
+            if (e.totalWithdrawal >= 500000.0 || e.turnover >= 90.0)
+            {
+                e.flag = "Suspicious"
+            }
+            entries.add(e)
+        }
+    }
+
+    // ung suspicious magiging 0 sa sorting, tapos ung normal magiging 1, so mauna ang suspicious
+    val sortedEntries = entries.sortedWith(compareBy({ it.date }, { if (it.flag == "Suspicious") 0 else 1 }))
+
+    for (entry in sortedEntries)
+    {
+        out.appendText("${entry.name},${entry.date.format(dateFormat)},${"%,.2f".format(entry.totalWithdrawal)}," +
+                "${entry.numDeposits},${"%,.2f".format(entry.totalDeposit)},${"%,.2f".format(entry.turnover)}," +
+                "${entry.flag}\n")
+    }
+
+    for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
+    {
+        val e = sortedEntries[i]
+        println(e.name + " | " + e.date.format(dateFormat) + " | " + "%,.2f".format(e.totalWithdrawal) + " | " +
+                e.numDeposits + " | " + "%,.2f".format(e.totalDeposit) + " | " +
+                "%,.2f".format(e.turnover) + " | " + e.flag)
+    }
+
+    println("\n~~~ Full table exported to report3_suspicious_client_behavior.csv")
 }
 
 fun report4()
