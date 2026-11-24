@@ -29,6 +29,11 @@ val divider = "_____________________________________________"
 val transactionList = mutableListOf<transactions>() // create empty list na pwede maedit
 var fileLoaded = false
 
+fun formatCsvNumber(value: Double): String
+{
+    return "\"${"%,.2f".format(value)}\""
+}
+
 fun readFile()
 {
     val lines = File("bank_transactions.csv").readLines().drop(1) // lines[0]...
@@ -272,7 +277,7 @@ fun report1()
     val sortedEntries = entries.sortedByDescending { it.averageDailyBalance }
     for (entry in sortedEntries)
     {
-        out.appendText("${entry.name},${entry.age},${"%,.2f".format(entry.balance)},${"%,.2f".format(entry.ave)},${entry.tier}\n")
+        out.appendText("${entry.name},${entry.age},${formatCsvNumber(entry.balance)},${formatCsvNumber(entry.ave)},${entry.tier}\n")
     }
 
     for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
@@ -335,7 +340,7 @@ fun report2()
 
     for (entry in sortedEntries)
     {
-        out.appendText("${entry.name},${"%,.2f".format(entry.balance)},${"%,.2f".format(entry.interest)}\n")
+        out.appendText("${entry.name},${formatCsvNumber(entry.balance)},${formatCsvNumber(entry.interest)}\n")
     }
 
     for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
@@ -420,8 +425,8 @@ fun report3()
 
     for (entry in sortedEntries)
     {
-        out.appendText("${entry.name},${entry.date.format(dateFormat)},${"%,.2f".format(entry.totalWithdrawal)}," +
-                "${entry.numDeposits},${"%,.2f".format(entry.totalDeposit)},${"%,.2f".format(entry.turnover)}," +
+        out.appendText("${entry.name},${entry.date.format(dateFormat)},${formatCsvNumber(entry.totalWithdrawal)}," +
+                "${entry.numDeposits},${formatCsvNumber(entry.totalDeposit)},${formatCsvNumber(entry.turnover)}," +
                 "${entry.flag}\n")
     }
 
@@ -490,9 +495,9 @@ fun report4()
     
     for (entry in months)
     {
-        out.appendText("${entry.year},${entry.month},${entry.numDeposits},${"%,.2f".format(entry.totalDeposits)}," +
-                "${entry.numWithdrawals},${"%,.2f".format(entry.totalWithdrawals)}," +
-                "${"%,.2f".format(entry.totalDeposits - entry.totalWithdrawals)}\n")
+        out.appendText("${entry.year},${entry.month},${entry.numDeposits},${formatCsvNumber(entry.totalDeposits)}," +
+                "${entry.numWithdrawals},${formatCsvNumber(entry.totalWithdrawals)}," +
+                "${formatCsvNumber(entry.totalDeposits - entry.totalWithdrawals)}\n")
     }
 
     for (i in 0 until minOf(2, months.size)) //incase there are less than 2 entries
@@ -854,6 +859,61 @@ fun showInterest()
     }
 }
 
+fun summary()
+{
+    var totalDeposits = 0.0
+    var totalWithdrawals = 0.0
+
+    // account number to latest balance (each row overwrites the previous one)
+    val latestBalance = mutableMapOf<String, Double>()
+
+    for (t in transactionList)
+    {
+        if (t.currency == "PHP")
+        {
+            if (t.type == "deposit")
+            {
+                totalDeposits += t.amount
+            }
+            else if (t.type == "withdrawal")
+            {
+                totalWithdrawals += t.amount
+            }
+
+            latestBalance[t.number] = t.balance
+        }
+    }
+
+    val totalAccounts = latestBalance.size
+    var totalBalance = 0.0
+    var totalInterest = 0.0
+
+    for (balance in latestBalance.values)
+    {
+        totalBalance = totalBalance + balance
+
+        if (balance >= 10000.0)
+        {
+            val interest = balance * 0.05 / 365 * 30
+            totalInterest = totalInterest + Math.round(interest * 100) / 100.0
+        }
+    }
+
+    val json = 
+    """{
+      "total_accounts": $totalAccounts,
+      "total_deposits": ${"%.2f".format(totalDeposits)},
+      "total_withdrawals": ${"%.2f".format(totalWithdrawals)},
+      "total_balance": ${"%.2f".format(totalBalance)},
+      "total_interest_expense": ${"%.2f".format(totalInterest)}
+    }""".trimIndent()
+
+    File("summary.json").writeText(json)
+
+    println("Summary State (summary.json):")
+    println(json)
+}
+
 fun generate()
 {
     if (!fileLoaded)
@@ -869,6 +929,7 @@ fun generate()
     report2()
     report3()
     report4()
+    summary()
 }
 
 fun generateReports()
