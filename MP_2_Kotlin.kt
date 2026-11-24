@@ -199,9 +199,9 @@ fun report1()
     println(" ~~~ Report 1: Banking Privilege Tiers")
     println(divider)
 
-
     val out = File("report1_banking_privilege_tiers.csv")
     out.writeText("account_name,account_age,current_balance,average_daily_balance,privilege_tier\n")
+
     data class reportEntry (
         val name: String,
         val age: Long,
@@ -272,11 +272,77 @@ fun report1()
     {
         out.appendText("${entry.name},${entry.age},${"%,.2f".format(entry.balance)},${"%,.2f".format(entry.ave)},${entry.tier}\n")
     }
+
+    for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
+    {
+        val e = sortedEntries[i]
+        println(e.name + " | " + e.age + " | " + "%,.2f".format(e.balance) + " | " +
+                "%,.2f".format(e.ave) + " | " + e.tier)
+    }
+
+    println("\n~~~ Full table exported to report1_banking_privilege_tiers.csv")
 }
 
 fun report2()
 {
-    ...
+    println(divider)
+    println(" ~~~ Report 2: Interest Expense Projection")
+    println(divider)
+
+    val out = File("report2_interest_expense_projection.csv")
+    out.writeText("account_name,current_balance,expected_interest\n")
+
+    data class reportEntry (
+        val name: String,
+        val balance: Double,
+        val interest: Double    // expected interest after 30 days
+    )
+
+    val accountNumbers = removeDuplicateAccountNumbers()
+    val entries = mutableListOf<reportEntry>()
+    val totalInterest = 0.0
+
+    val reversedList = transactionList.reversed() // para latest nlng kunin
+    for (accountNumber in accountNumbers)
+    {
+        var name = ""
+        var currentBalance = 0.0
+
+        for (t in reversedList)
+        {
+            if (t.number == accountNumber && t.currency == "PHP")
+            {
+                name = t.name
+                currentBalance = t.balance
+                break
+            }
+        }
+
+        // 2. keep only balances of 10,000 and above
+        if (currentBalance >= 10000.0)
+        {
+            val dailyInterest = currentBalance * 0.05 / 365
+            val expected = Math.round(dailyInterest * 30 * 100) / 100.0   // 30 days, 2 decimals
+
+            entries.add(reportEntry(name, currentBalance, expected))
+            totalInterest = totalInterest + expected
+        }
+    }
+
+    val sortedEntries = entries.sortedByDescending {it.interest}
+
+    for (entry in sortedEntries)
+    {
+        out.appendText("${entry.name},${"%,.2f".format(entry.balance)},${"%,.2f".format(entry.interest)}\n")
+    }
+
+    for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
+    {
+        val e = sortedEntries[i]
+        println(e.name + " | " + "%,.2f".format(e.balance) + " | " + "%,.2f".format(e.interest))
+    }
+
+    println("\n~~~ Full table exported to report2_interest_expense_projection.csv")
 }
 
 fun report3()
@@ -320,6 +386,8 @@ fun askAccount(): Int
             println("Account not found.")
             continue
         }
+        
+        println("Account Name: ${transactionList[index].name}")
         return index
     }
 }
