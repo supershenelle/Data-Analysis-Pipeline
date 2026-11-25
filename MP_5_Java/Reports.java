@@ -13,6 +13,7 @@ import java.util.*;
 public class Reports{
 
     private LocalDate latestDate; // newest date sa file
+    private double totalInterest = 0;
     private HashMap<Long, ArrayList<TransactionRecords.Transaction>> byAccount = new HashMap<>(); // hashmap that maps each account number to their list of transactions
 
     // records that represent a line in each respective report
@@ -221,6 +222,7 @@ public class Reports{
 
             if(last.currentBalance() >= 10000){
                 double interest = ints.dailyInterest(last.currentBalance()) * 30;
+                totalInterest += interest;
                 interestRecords.add(new InterestPerUser(last.accountName(), last.currentBalance(), interest));
             }
         }
@@ -343,4 +345,42 @@ public class Reports{
         reportsOnCsv("report4_top_10_active_users.csv", "Rank,AccountName,AccountNumber,TransactionCount", lines);
     }
     
+    public void summary(){
+        double totalDeposits = 0;
+        double totalWithdrawals = 0;
+        double totalBalance = 0;
+
+        // iterates through every account, then through every transaction history
+        for(ArrayList<TransactionRecords.Transaction> row: byAccount.values()){
+            for(TransactionRecords.Transaction t: row){
+                if(t.type().equals("deposit")){
+                    totalDeposits += t.amount();
+                } else{
+                    totalWithdrawals += t.amount();
+                }
+            }
+            totalBalance += row.get(row.size()-1).currentBalance(); // adds the balance
+        }
+
+        String jsonOutput = String.format("{\"total_accounts\": %d, \"total_deposits\": %.2f, \"total_withdrawals\": %.2f, \"total_balance\": %.2f, \"total_interest_expense\": %.2f}",
+                byAccount.size(), totalDeposits, totalWithdrawals, totalBalance, totalInterest);
+        String jsonFile = String.format("{\n" +
+                            "  \"total_accounts\": %d,\n" +
+                            "  \"total_deposits\": %.2f,\n" +
+                            "  \"total_withdrawals\": %.2f,\n" +
+                            "  \"total_balance\": %.2f,\n" +
+                            "  \"total_interest_expense\": %.2f\n" +
+                            "}",
+                            byAccount.size(), totalDeposits, totalWithdrawals, totalBalance, totalInterest);
+
+        try(PrintWriter out = new PrintWriter(new FileWriter("summary.json", false))){
+            out.println(jsonFile);
+        } catch(IOException e){
+            System.out.println("Error: Could not save to summary.json");
+            return;
+        }
+
+        System.out.println("Summary State (summary.json):");
+        System.out.println(jsonOutput);
+    }
 }
