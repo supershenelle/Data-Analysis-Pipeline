@@ -735,7 +735,7 @@ fun report3()
     println(divider)
 
     val out = File("report3_suspicious_client_behavior.csv")
-    out.writeText("account_name,current_balance,expected_interest\n")
+    out.writeText("account_name,date,total_withdrawals,number_of_deposits,total_deposits,turnover,flag\n")
 
     data class dayEntry (
         val name: String,
