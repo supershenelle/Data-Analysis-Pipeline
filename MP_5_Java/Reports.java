@@ -83,13 +83,56 @@ public class Reports{
 
 
         // for the table preview for every report
-        System.out.println(header);
-        for(int i=0; i < Math.min(2, lines.size()); i++){
-            System.out.println(lines.get(i));
-        }
+        printPreviewTable(header, lines);
         System.out.println();
         System.out.println("(Full table exported to " + fileName + ")");
         System.out.println();
+    }
+
+    /**
+     * This function creates the preview table for each report generated
+     * @param header is a string that represents the header of the report.
+     * @param lines is a string that represents each row/line written on the report.
+     */
+    public void printPreviewTable(String header, ArrayList<String> lines){
+        
+        // gets header and first two rows
+        ArrayList<String> content = new ArrayList<>();
+        content.add(header);
+        
+        for(int i=0; i< Math.min(2, lines.size()); i++){
+            content.add(lines.get(i));
+        }
+
+        // splits into each column
+        ArrayList<String[]> table = new ArrayList<>();
+        for(String line: content){
+            String[] parts = line.split("\""); 
+            String row = "";
+            for(int j=0; j<parts.length; j++)
+                if(j%2 == 0){
+                    row +=parts[j].replace(",", ";");
+                } else {
+                    row += parts[j];
+                }
+            }
+            table.add(row.split(";"));
+        }
+
+        // columns gets as wide as the longest value para equal
+        int[] widths = new int[table.get(0).length];
+        for(String[] cols: table){
+            for(int k=0; k< cols.length; k++){
+                widths[k] = Math.max(widths[k], cols[k].length());
+            }
+        }
+
+        for(String[] cols: table){
+            for(int c=0; c <cols.length; c++){
+                System.out.printf("%-" + widths[c] + "s |  ", cols[c]);
+            }
+            System.out.println();
+        }
     }
 
     
