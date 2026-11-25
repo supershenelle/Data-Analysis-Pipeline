@@ -198,318 +198,6 @@ fun removeDuplicateAccountNumbers(): List<String>
     return accountNumbers
 }
 
-fun report1()
-{
-    println("\n$divider")
-    println("~~~ Report 1: Banking Privilege Tiers")
-    println(divider)
-
-    val out = File("report1_banking_privilege_tiers.csv")
-    out.writeText("account_name,account_age,current_balance,average_daily_balance,privilege_tier\n")
-
-    data class reportEntry (
-        val name: String,
-        val age: Long,
-        val balance: Double,
-        val ave: Double, //sum of all end day balances / total number of days in a month
-        val tier: String
-    )
-
-    val accountNumbers = removeDuplicateAccountNumbers()
-    val date = LocalDate.now().minusMonths(1) //last month
-    val year = date.year
-    val month = date.monthValue
-    val daysInMonth = date.lengthOfMonth()
-    val entries = mutableListOf<reportEntry>()
-
-    for (accountNumber in accountNumbers)
-    {
-        //default valuess before hanapin ung account number
-        var name = ""
-        var opened = date
-        var currentBalance = 0.0
-        var finalCurrentBalance = 0.0
-        var tier = "None"
-
-        for (t in transactionList)
-        {
-            if (t.number == accountNumber && t.currency == "PHP") //find in the list
-            {
-                name = t.name
-                opened = t.date
-                val age = java.time.temporal.ChronoUnit.DAYS.between(opened, LocalDate.now())
-                
-                var totalBalance = 0.0
-                for (day in 1..daysInMonth)
-                {
-                    val dayEnd = date.withDayOfMonth(day)
-                    for (transaction in transactionList) // scan buong month history
-                    {
-                        if (transaction.number == accountNumber &&
-                            transaction.currency == "PHP" &&
-                            transaction.date.isBefore(dayEnd))
-                        {
-                            currentBalance = transaction.balance
-                            finalCurrentBalance = currentBalance // update the balance for the day
-                        }
-                    }
-                    totalBalance += currentBalance
-                }
-                val averageDailyBalance = totalBalance / daysInMonth
-
-                if (averageDailyBalance >= 100000)
-                {
-                    when (averageDailyBalance)
-                    {
-                        in 100000.0..499999.99 -> tier = "Silver"
-                        in 500000.0..999999.99 -> tier = "Gold"
-                        else -> tier = "Platinum"
-                    }
-
-                    entries.add(reportEntry(name, age, finalCurrentBalance, averageDailyBalance, tier))
-                }
-            }
-        }
-    }
-
-    val sortedEntries = entries.sortedByDescending { it.ave }
-    for (entry in sortedEntries)
-    {
-        out.appendText("${entry.name},${entry.age},${formatCsvNumber(entry.balance)},${formatCsvNumber(entry.ave)},${entry.tier}\n")
-    }
-
-    for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
-    {
-        val e = sortedEntries[i]
-        println(e.name + " | " + e.age + " | " + "%,.2f".format(e.balance) + " | " +
-                "%,.2f".format(e.ave) + " | " + e.tier)
-    }
-
-    println("\n~~~ Full table exported to report1_banking_privilege_tiers.csv")
-}
-
-fun report2()
-{
-    println("\n$divider")
-    println("~~~ Report 2: Interest Expense Projection")
-    println(divider)
-
-    val out = File("report2_interest_expense_projection.csv")
-    out.writeText("account_name,current_balance,expected_interest\n")
-
-    data class reportEntry (
-        val name: String,
-        val balance: Double,
-        val interest: Double    // expected interest after 30 days
-    )
-
-    val accountNumbers = removeDuplicateAccountNumbers()
-    val entries = mutableListOf<reportEntry>()
-    var totalInterest = 0.0
-
-    val reversedList = transactionList.reversed() // para latest nlng kunin
-    for (accountNumber in accountNumbers)
-    {
-        var name = ""
-        var currentBalance = 0.0
-
-        for (t in reversedList)
-        {
-            if (t.number == accountNumber && t.currency == "PHP")
-            {
-                name = t.name
-                currentBalance = t.balance
-                break
-            }
-        }
-
-        // 2. keep only balances of 10,000 and above
-        if (currentBalance >= 10000.0)
-        {
-            val dailyInterest = currentBalance * 0.05 / 365
-            val expected = Math.round(dailyInterest * 30 * 100) / 100.0   // 30 days, 2 decimals
-
-            entries.add(reportEntry(name, currentBalance, expected))
-            totalInterest = totalInterest + expected
-        }
-    }
-
-    val sortedEntries = entries.sortedByDescending {it.interest}
-
-    for (entry in sortedEntries)
-    {
-        out.appendText("${entry.name},${formatCsvNumber(entry.balance)},${formatCsvNumber(entry.interest)}\n")
-    }
-
-    for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
-    {
-        val e = sortedEntries[i]
-        println(e.name + " | " + "%,.2f".format(e.balance) + " | " + "%,.2f".format(e.interest))
-    }
-
-    println("\n~~~ Full table exported to report2_interest_expense_projection.csv")
-}
-
-fun report3()
-{
-    println("\n$divider")
-    println("~~~ Report 3: Suspicious Client Behavior")
-    println(divider)
-
-    val out = File("report3_suspicious_client_behavior.csv")
-    out.writeText("account_name,current_balance,expected_interest\n")
-
-    data class dayEntry (
-        val name: String,
-        val date: LocalDate,
-        var totalWithdrawal: Double = 0.0,
-        var numDeposits: Int = 0,
-        var totalDeposit: Double = 0.0,
-        var turnover: Double = 0.0,
-        var flag: String = "Normal"
-    )
-
-    // one acc per day sa history so ccheck lahat ("1092000100" -> [ 01/12/2025 entry, 03/12/2025 entry, ... ])
-    val accountTransactions = mutableMapOf<String, MutableList<dayEntry>>() // key: account number, value: list of dayEntry
-    for (t in transactionList)
-    {
-        if (t.currency == "PHP")
-        {
-            var days = accountTransactions[t.number] // kunin ung values
-            if (days == null)
-            {
-                days = mutableListOf()
-                accountTransactions[t.number] = days //create new empty if wala pa
-            }
-
-            if (days.isEmpty() || days.last().date != t.date) // check if new day ba to
-            {
-                days.add(dayEntry(t.name, t.date)) // new day: add a fresh entry
-            }
-            val entry = days.last() //* */
-
-            if (t.type == "withdrawal")
-            {
-                entry.totalWithdrawal += t.amount
-            }
-            else if (t.type == "deposit")
-            {
-                entry.numDeposits++
-                entry.totalDeposit += t.amount
-            }
-        }
-    }
-
-    val entries = mutableListOf<dayEntry>()
-    for (days in accountTransactions.values)
-    {
-        for (e in days)
-        {
-            if (e.totalDeposit > 0)
-            {
-                e.turnover = e.totalWithdrawal / e.totalDeposit * 100
-            }
-
-            if (e.totalWithdrawal >= 500000.0 || e.turnover >= 90.0)
-            {
-                e.flag = "Suspicious"
-            }
-            entries.add(e)
-        }
-    }
-
-    // ung suspicious magiging 0 sa sorting, tapos ung normal magiging 1, so mauna ang suspicious
-    val sortedEntries = entries.sortedWith(compareBy({ it.date }, { if (it.flag == "Suspicious") 0 else 1 }))
-
-    for (entry in sortedEntries)
-    {
-        out.appendText("${entry.name},${entry.date.format(dateFormat)},${formatCsvNumber(entry.totalWithdrawal)}," +
-                "${entry.numDeposits},${formatCsvNumber(entry.totalDeposit)},${formatCsvNumber(entry.turnover)}," +
-                "${entry.flag}\n")
-    }
-
-    for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
-    {
-        val e = sortedEntries[i]
-        println(e.name + " | " + e.date.format(dateFormat) + " | " + "%,.2f".format(e.totalWithdrawal) + " | " +
-                e.numDeposits + " | " + "%,.2f".format(e.totalDeposit) + " | " +
-                "%,.2f".format(e.turnover) + " | " + e.flag)
-    }
-
-    println("\n~~~ Full table exported to report3_suspicious_client_behavior.csv")
-}
-
-fun report4()
-{
-    println("\n$divider")
-    println("~~~ Report 4: Monthly Transaction Summary")
-    println(divider)
-
-    val out = File("report4_monthly_transaction_summary.csv")
-    out.writeText("year,month,num_deposits,total_deposits,num_withdrawals,total_withdrawals,net_cash_flow\n")
-    
-    data class monthEntry (
-        val year: Int,
-        val month: Int,
-        var numDeposits: Int = 0,
-        var totalDeposits: Double = 0.0,
-        var numWithdrawals: Int = 0,
-        var totalWithdrawals: Double = 0.0
-    )
-
-    val months = mutableListOf<monthEntry>()
-
-    // add every transaction to its month's entry parang ung sa report3, pero ung sa report4 is per month lang
-    for (t in transactionList)
-    {
-        if (t.currency != "PHP")
-        {
-            continue
-        }
-
-        val year = t.date.year
-        val month = t.date.monthValue
-
-        // first transaction of a new month: start a new entry
-        if (months.isEmpty() || months.last().year != year || months.last().month != month)
-        {
-            months.add(monthEntry(year, month))
-        }
-
-        // the current month's entry is always the last one in the list
-        val entry = months.last()
-
-        if (t.type == "deposit")
-        {
-            entry.numDeposits = entry.numDeposits + 1
-            entry.totalDeposits = entry.totalDeposits + t.amount
-        }
-        else
-        {
-            entry.numWithdrawals = entry.numWithdrawals + 1
-            entry.totalWithdrawals = entry.totalWithdrawals + t.amount
-        }
-    }
-    
-    for (entry in months)
-    {
-        out.appendText("${entry.year},${entry.month},${entry.numDeposits},${formatCsvNumber(entry.totalDeposits)}," +
-                "${entry.numWithdrawals},${formatCsvNumber(entry.totalWithdrawals)}," +
-                "${formatCsvNumber(entry.totalDeposits - entry.totalWithdrawals)}\n")
-    }
-
-    for (i in 0 until minOf(2, months.size)) //incase there are less than 2 entries
-    {
-        val e = months[i]
-        println("${e.year} | ${e.month} | ${e.numDeposits} | " +
-                "%,.2f".format(e.totalDeposits) + " | " + e.numWithdrawals + " | " +
-                "%,.2f".format(e.totalWithdrawals) + " | " +
-                "%,.2f".format(e.totalDeposits - e.totalWithdrawals))
-    }
-    
-    println("\n~~~ Full table exported to report4_monthly_transaction_summary.csv")
-}
-
 fun findAccount(accountNumber: String): Int
 {
     for (i in transactionList.indices.reversed())
@@ -885,6 +573,334 @@ fun showInterest()
     }
 }
 
+fun report1()
+{
+    println("\n$divider")
+    println("~~~ Report 1: Banking Privilege Tiers")
+    println(divider)
+
+    val out = File("report1_banking_privilege_tiers.csv")
+    out.writeText("account_name,account_age,current_balance,average_daily_balance,privilege_tier\n")
+
+    data class reportEntry (
+        val name: String,
+        val age: Long,
+        val balance: Double,
+        val ave: Double, //sum of all end day balances / total number of days in a month
+        val tier: String
+    )
+
+    val accountNumbers = removeDuplicateAccountNumbers()
+    val date = LocalDate.now().minusMonths(1) //last month
+    val year = date.year
+    val month = date.monthValue
+    val daysInMonth = date.lengthOfMonth()
+    val entries = mutableListOf<reportEntry>()
+
+    for (accountNumber in accountNumbers)
+    {
+        val accountTransactions = transactionList.filter {
+            it.number == accountNumber && it.currency == "PHP"
+        }
+        if (accountTransactions.isEmpty())
+        {
+            continue
+        }
+
+        val name = accountTransactions.first().name
+        val opened = accountTransactions.minOf { it.date }
+        val age = java.time.temporal.ChronoUnit.DAYS.between(opened, LocalDate.now())
+        var currentBalance = 0.0
+        var finalCurrentBalance = 0.0
+        var tier = "None"
+
+        var totalBalance = 0.0
+        for (day in 1..daysInMonth)
+        {
+            val dayEnd = date.withDayOfMonth(day)
+            for (transaction in accountTransactions)
+            {
+                if (transaction.date.isBefore(dayEnd))
+                {
+                    currentBalance = transaction.balance
+                    finalCurrentBalance = currentBalance
+                }
+            }
+            totalBalance += currentBalance
+        }
+        val averageDailyBalance = totalBalance / daysInMonth
+
+        if (averageDailyBalance >= 100000)
+        {
+            when (averageDailyBalance)
+            {
+                in 100000.0..499999.99 -> tier = "Silver"
+                in 500000.0..999999.99 -> tier = "Gold"
+                else -> tier = "Platinum"
+            }
+
+            entries.add(reportEntry(name, age, finalCurrentBalance, averageDailyBalance, tier))
+        }
+    }
+
+    val sortedEntries = entries.sortedByDescending { it.ave }
+    for (entry in sortedEntries)
+    {
+        out.appendText("${entry.name},${entry.age},${formatCsvNumber(entry.balance)},${formatCsvNumber(entry.ave)},${entry.tier}\n")
+    }
+
+    println("%-20s | %11s | %15s | %21s | %-14s".format(
+    "Account Name", "Account Age", "Current Balance", "Average Daily Balance", "Privilege Tier"))
+    for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
+    {
+        val e = sortedEntries[i]
+        println("%-20s | %11d | %15s | %21s | %-14s".format(
+            e.name,
+            e.age,
+            "%,.2f".format(e.balance),
+            "%,.2f".format(e.ave),
+            e.tier))
+    }
+
+    println("\n~~~ Full table exported to report1_banking_privilege_tiers.csv")
+}
+
+fun report2()
+{
+    println("\n$divider")
+    println("~~~ Report 2: Interest Expense Projection")
+    println(divider)
+
+    val out = File("report2_interest_expense_projection.csv")
+    out.writeText("account_name,current_balance,expected_interest\n")
+
+    data class reportEntry (
+        val name: String,
+        val balance: Double,
+        val interest: Double    // expected interest after 30 days
+    )
+
+    val accountNumbers = removeDuplicateAccountNumbers()
+    val entries = mutableListOf<reportEntry>()
+    var totalInterest = 0.0
+
+    val reversedList = transactionList.reversed() // para latest nlng kunin
+    for (accountNumber in accountNumbers)
+    {
+        var name = ""
+        var currentBalance = 0.0
+
+        for (t in reversedList)
+        {
+            if (t.number == accountNumber && t.currency == "PHP")
+            {
+                name = t.name
+                currentBalance = t.balance
+                break
+            }
+        }
+
+        // 2. keep only balances of 10,000 and above
+        if (currentBalance >= 10000.0)
+        {
+            val dailyInterest = currentBalance * 0.05 / 365
+            val expected = Math.round(dailyInterest * 30 * 100) / 100.0   // 30 days, 2 decimals
+
+            entries.add(reportEntry(name, currentBalance, expected))
+            totalInterest = totalInterest + expected
+        }
+    }
+
+    val sortedEntries = entries.sortedByDescending {it.interest}
+
+    for (entry in sortedEntries)
+    {
+        out.appendText("${entry.name},${formatCsvNumber(entry.balance)},${formatCsvNumber(entry.interest)}\n")
+    }
+
+    println("%-20s | %15s | %17s".format("Account Name", "Current Balance", "Expected Interest"))
+    for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
+    {
+        val e = sortedEntries[i]
+        println("%-20s | %15s | %17s".format(e.name, "%,.2f".format(e.balance), "%,.2f".format(e.interest)))
+    }
+
+    println("\n~~~ Full table exported to report2_interest_expense_projection.csv")
+}
+
+fun report3()
+{
+    println("\n$divider")
+    println("~~~ Report 3: Suspicious Client Behavior")
+    println(divider)
+
+    val out = File("report3_suspicious_client_behavior.csv")
+    out.writeText("account_name,current_balance,expected_interest\n")
+
+    data class dayEntry (
+        val name: String,
+        val date: LocalDate,
+        var totalWithdrawal: Double = 0.0,
+        var numDeposits: Int = 0,
+        var totalDeposit: Double = 0.0,
+        var turnover: Double = 0.0,
+        var flag: String = "Normal"
+    )
+
+    // one acc per day sa history so ccheck lahat ("1092000100" -> [ 01/12/2025 entry, 03/12/2025 entry, ... ])
+    val accountTransactions = mutableMapOf<String, MutableList<dayEntry>>() // key: account number, value: list of dayEntry
+    for (t in transactionList)
+    {
+        if (t.currency == "PHP")
+        {
+            var days = accountTransactions[t.number] // kunin ung values
+            if (days == null)
+            {
+                days = mutableListOf()
+                accountTransactions[t.number] = days //create new empty if wala pa
+            }
+
+            if (days.isEmpty() || days.last().date != t.date) // check if new day ba to
+            {
+                days.add(dayEntry(t.name, t.date)) // new day: add a fresh entry
+            }
+            val entry = days.last() //* */
+
+            if (t.type == "withdrawal")
+            {
+                entry.totalWithdrawal += t.amount
+            }
+            else if (t.type == "deposit")
+            {
+                entry.numDeposits++
+                entry.totalDeposit += t.amount
+            }
+        }
+    }
+
+    val entries = mutableListOf<dayEntry>()
+    for (days in accountTransactions.values)
+    {
+        for (e in days)
+        {
+            if (e.totalDeposit > 0)
+            {
+                e.turnover = e.totalWithdrawal / e.totalDeposit * 100
+            }
+
+            if (e.totalWithdrawal >= 500000.0 || e.turnover >= 90.0)
+            {
+                e.flag = "Suspicious"
+            }
+            entries.add(e)
+        }
+    }
+
+    // ung suspicious magiging 0 sa sorting, tapos ung normal magiging 1, so mauna ang suspicious
+    val sortedEntries = entries.sortedWith(compareBy({ it.date }, { if (it.flag == "Suspicious") 0 else 1 }))
+
+    for (entry in sortedEntries)
+    {
+        out.appendText("${entry.name},${entry.date.format(dateFormat)},${formatCsvNumber(entry.totalWithdrawal)}," +
+                "${entry.numDeposits},${formatCsvNumber(entry.totalDeposit)},${formatCsvNumber(entry.turnover)}," +
+                "${entry.flag}\n")
+    }
+
+    println("%-20s | %-10s | %17s | %18s | %14s | %12s | %-10s".format(
+    "Account Name", "Date", "Total Withdrawals", "Number of Deposits", "Total Deposits", "Turnover (%)", "Flag"))
+    for (i in 0 until minOf(2, sortedEntries.size)) //incase there are less than 2 entries
+    {
+        val e = sortedEntries[i]
+        println("%-20s | %-10s | %17s | %18d | %14s | %12s | %-10s".format(
+            e.name,
+            e.date.format(dateFormat),
+            "%,.2f".format(e.totalWithdrawal),
+            e.numDeposits,
+            "%,.2f".format(e.totalDeposit),
+            "%,.2f".format(e.turnover),
+            e.flag))
+    }
+
+    println("\n~~~ Full table exported to report3_suspicious_client_behavior.csv")
+}
+
+fun report4()
+{
+    println("\n$divider")
+    println("~~~ Report 4: Monthly Transaction Summary")
+    println(divider)
+
+    val out = File("report4_monthly_transaction_summary.csv")
+    out.writeText("year,month,num_deposits,total_deposits,num_withdrawals,total_withdrawals,net_cash_flow\n")
+    
+    data class monthEntry (
+        val year: Int,
+        val month: Int,
+        var numDeposits: Int = 0,
+        var totalDeposits: Double = 0.0,
+        var numWithdrawals: Int = 0,
+        var totalWithdrawals: Double = 0.0
+    )
+
+    val months = mutableListOf<monthEntry>()
+
+    // add every transaction to its month's entry parang ung sa report3, pero ung sa report4 is per month lang
+    for (t in transactionList)
+    {
+        if (t.currency != "PHP")
+        {
+            continue
+        }
+
+        val year = t.date.year
+        val month = t.date.monthValue
+
+        // first transaction of a new month: start a new entry
+        if (months.isEmpty() || months.last().year != year || months.last().month != month)
+        {
+            months.add(monthEntry(year, month))
+        }
+
+        // the current month's entry is always the last one in the list
+        val entry = months.last()
+
+        if (t.type == "deposit")
+        {
+            entry.numDeposits = entry.numDeposits + 1
+            entry.totalDeposits = entry.totalDeposits + t.amount
+        }
+        else
+        {
+            entry.numWithdrawals = entry.numWithdrawals + 1
+            entry.totalWithdrawals = entry.totalWithdrawals + t.amount
+        }
+    }
+    
+    for (entry in months)
+    {
+        out.appendText("${entry.year},${entry.month},${entry.numDeposits},${formatCsvNumber(entry.totalDeposits)}," +
+                "${entry.numWithdrawals},${formatCsvNumber(entry.totalWithdrawals)}," +
+                "${formatCsvNumber(entry.totalDeposits - entry.totalWithdrawals)}\n")
+    }
+
+    println("%4s | %5s | %18s | %14s | %21s | %17s | %13s".format(
+    "Year", "Month", "Number of Deposits", "Total Deposits", "Number of Withdrawals", "Total Withdrawals", "Net Cash Flow"))
+    for (i in 0 until minOf(2, months.size)) //incase there are less than 2 entries
+    {
+        val e = months[i]
+        println("%4d | %5d | %18d | %14s | %21d | %17s | %13s".format(
+            e.year,
+            e.month,
+            e.numDeposits,
+            "%,.2f".format(e.totalDeposits),
+            e.numWithdrawals,
+            "%,.2f".format(e.totalWithdrawals),
+            "%,.2f".format(e.totalDeposits - e.totalWithdrawals)))
+    }
+    
+    println("\n~~~ Full table exported to report4_monthly_transaction_summary.csv")
+}
+
 fun summary()
 {
     var totalDeposits = 0.0
@@ -948,9 +964,7 @@ fun generate()
         return
     }
 
-    println("\n$divider")
-    println("~~~ Generating reports / outputting to CSV files...")
-    println(divider)
+    println("\n~~~ Generating reports / outputting to CSV files...")
 
     report1()
     report2()
