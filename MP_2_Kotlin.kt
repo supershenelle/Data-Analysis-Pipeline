@@ -25,7 +25,7 @@ data class transactions (
 val currencyRates = arrayOfNulls<Double>(6)
 val dateFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 val timeFormat = DateTimeFormatter.ofPattern("H:mm:ss")
-val divider = "_____________________________________________"
+val divider = "══════════════════════════════════════════════════════════════════════════════════════"
 val transactionList = mutableListOf<transactions>() // create empty list na pwede maedit
 var fileLoaded = false
 
@@ -34,9 +34,10 @@ fun formatCsvNumber(value: Double): String
     return "\"${"%,.2f".format(value)}\""
 }
 
-fun readFile()
+fun readFile(showSummary: Boolean = false)
 {
     val lines = File("bank_transactions.csv").readLines().drop(1) // lines[0]...
+    transactionList.clear()
 
     var invalid = 0
     for (line in lines)
@@ -83,23 +84,16 @@ fun readFile()
         transactionList.add(t)
     }
 
-    var phpCount = 0.0
-    for (transaction in transactionList)
+    if (showSummary)
     {
-        if (transaction.currency == "PHP")
-        {
-            phpCount += transaction.amount
-        }
+        val rows = transactionList.size
+        val filtered = transactionList.count { it.currency == "PHP" }
+
+        println("\n$divider")
+        println("~~~ CSV File Log Summary")
+        println(divider)
+        println("Processing dataset... ($rows rows loaded, $filtered filtered for PHP currency)")
     }
-
-    println(divider)
-    println(" ~~~ CSV File Log Summary")
-    println(divider)
-
-    println("Rows read: ${lines.size}")
-    println("Rows invalid: ${invalid}")
-    println("Rows valid: ${transactionList.size}")
-    println("Transactions in PHP: $phpCount")
     fileLoaded = true
 }
 
@@ -107,14 +101,18 @@ fun register()
 {
     while (true)
     {
+        println("\n$divider")
+        println("~~~ Register Account")
         println(divider)
-        println(" ~~~ Register Account")
-        println(divider)
+
+        var name = ""
+        var number = ""
+        var deposit = 0.0
 
         while (true)
         {
             println("Enter Account Name (firstName lastName): ")
-            val accountName = readLine().trim()
+            val accountName = readln().trim()
             if (accountName.isEmpty())
             {
                 println("Account Name cannot be empty.")
@@ -134,7 +132,7 @@ fun register()
         while (true)
         {
             println("Enter Account Number (10 digits): ")
-            val accountNumber = readLine().trim()
+            val accountNumber = readln().trim()
             if (accountNumber.length != 10 || !accountNumber.all {it.isDigit()})
             {
                 println("Account Number must be exactly 10 digits.")
@@ -148,7 +146,7 @@ fun register()
         while (true)
         {
             println("Enter Initial Deposit Amount: ")
-            val depositInput = readLine().trim()
+            val depositInput = readln().trim()
             val depositAmount = depositInput.toDoubleOrNull()
             if (depositAmount == null || depositAmount < 5000)
             {
@@ -176,7 +174,7 @@ fun register()
         while (true)
         {
             print("Register another account? (Y/N): ")
-            when (readLine().trim().lowercase())
+            when (readln().trim().lowercase())
             {
                 "y" -> break
                 "n" -> return
@@ -202,8 +200,8 @@ fun removeDuplicateAccountNumbers(): List<String>
 
 fun report1()
 {
-    println(divider)
-    println(" ~~~ Report 1: Banking Privilege Tiers")
+    println("\n$divider")
+    println("~~~ Report 1: Banking Privilege Tiers")
     println(divider)
 
     val out = File("report1_banking_privilege_tiers.csv")
@@ -228,7 +226,7 @@ fun report1()
     {
         //default valuess before hanapin ung account number
         var name = ""
-        var opened = monthEnd
+        var opened = date
         var currentBalance = 0.0
         var finalCurrentBalance = 0.0
         var tier = "None"
@@ -239,7 +237,7 @@ fun report1()
             {
                 name = t.name
                 opened = t.date
-                age = java.time.temporal.ChronoUnit.DAYS.between(opened, LocalDate.now())
+                val age = java.time.temporal.ChronoUnit.DAYS.between(opened, LocalDate.now())
                 
                 var totalBalance = 0.0
                 for (day in 1..daysInMonth)
@@ -274,7 +272,7 @@ fun report1()
         }
     }
 
-    val sortedEntries = entries.sortedByDescending { it.averageDailyBalance }
+    val sortedEntries = entries.sortedByDescending { it.ave }
     for (entry in sortedEntries)
     {
         out.appendText("${entry.name},${entry.age},${formatCsvNumber(entry.balance)},${formatCsvNumber(entry.ave)},${entry.tier}\n")
@@ -292,8 +290,8 @@ fun report1()
 
 fun report2()
 {
-    println(divider)
-    println(" ~~~ Report 2: Interest Expense Projection")
+    println("\n$divider")
+    println("~~~ Report 2: Interest Expense Projection")
     println(divider)
 
     val out = File("report2_interest_expense_projection.csv")
@@ -307,7 +305,7 @@ fun report2()
 
     val accountNumbers = removeDuplicateAccountNumbers()
     val entries = mutableListOf<reportEntry>()
-    val totalInterest = 0.0
+    var totalInterest = 0.0
 
     val reversedList = transactionList.reversed() // para latest nlng kunin
     for (accountNumber in accountNumbers)
@@ -354,8 +352,8 @@ fun report2()
 
 fun report3()
 {
-    println(divider)
-    println(" ~~~ Report 3: Suspicious Client Behavior")
+    println("\n$divider")
+    println("~~~ Report 3: Suspicious Client Behavior")
     println(divider)
 
     val out = File("report3_suspicious_client_behavior.csv")
@@ -443,8 +441,8 @@ fun report3()
 
 fun report4()
 {
-    println(divider)
-    println(" ~~~ Report 4: Monthly Transaction Summary")
+    println("\n$divider")
+    println("~~~ Report 4: Monthly Transaction Summary")
     println(divider)
 
     val out = File("report4_monthly_transaction_summary.csv")
@@ -503,7 +501,7 @@ fun report4()
     for (i in 0 until minOf(2, months.size)) //incase there are less than 2 entries
     {
         val e = months[i]
-        println(e.year + " | " + e.month + " | " + e.numDeposits + " | " +
+        println("${e.year} | ${e.month} | ${e.numDeposits} | " +
                 "%,.2f".format(e.totalDeposits) + " | " + e.numWithdrawals + " | " +
                 "%,.2f".format(e.totalWithdrawals) + " | " +
                 "%,.2f".format(e.totalDeposits - e.totalWithdrawals))
@@ -529,7 +527,7 @@ fun askAccount(): Int
     while (true)
     {
         println("Enter Account Number: ")
-        val accountNumber = readLine().trim()
+        val accountNumber = readln().trim()
         val index = findAccount(accountNumber)
 
         if (accountNumber.length != 10 || !accountNumber.all {it.isDigit()})
@@ -551,8 +549,8 @@ fun askAccount(): Int
 
 fun deposit()
 {
-    println(divider)
-    println(" ~~~ Deposit Amount")
+    println("\n$divider")
+    println("~~~ Deposit Amount")
     println(divider)
 
     val index = askAccount()
@@ -570,7 +568,7 @@ fun deposit()
         while (true)
         {
             print("Enter deposit amount: ")
-            val amount = readLine().trim().toDoubleOrNull()
+            val amount = readln().trim().toDoubleOrNull()
             if (amount == null || amount <= 0)
             {
                 println("Enter a valid amount greater than 0.")
@@ -586,7 +584,7 @@ fun deposit()
         while (true)
         {
             print("Deposit another amount (Y/N): ")
-            when (readLine().trim().lowercase())
+            when (readln().trim().lowercase())
             {
                 "y" -> break //exit this loop lang
                 "n" -> return //exit entire function
@@ -598,8 +596,8 @@ fun deposit()
 
 fun withdraw()
 {
-    println(divider)
-    println(" ~~~ Withdraw Amount")
+    println("\n$divider")
+    println("~~~ Withdraw Amount")
     println(divider)
 
     val index = askAccount()
@@ -617,7 +615,7 @@ fun withdraw()
         while (true)
         {
             print("Enter withdrawal amount: ")
-            val amount = readLine().trim().toDoubleOrNull()
+            val amount = readln().trim().toDoubleOrNull()
             if (amount == null || amount <= 0)
             {
                 println("Enter a valid amount greater than 0.")
@@ -639,7 +637,7 @@ fun withdraw()
         while (true)
         {
             print("Withdraw another amount (Y/N): ")
-            when (readLine().trim().lowercase())
+            when (readln().trim().lowercase())
             {
                 "y" -> break //exit this loop lang
                 "n" -> return
@@ -694,8 +692,8 @@ fun currencyExchange()
 
     while (true) // para magrestart loop kung may error sa input
     {
-        println(divider)
-        println(" ~~~ Currency Exchange")
+        println("\n$divider")
+        println("~~~ Currency Exchange")
         println(divider)
         
         println("Source Currency Option:")
@@ -748,7 +746,7 @@ fun currencyExchange()
 
         if (sourceRate == null || exchangeRate == null)
         {
-            print("\nConvert another currency (Y/N)? ")
+            print("\nExchange another currency? (Y/N): ")
             
             if (readln().trim().lowercase() != "y")
                 return // stop function
@@ -760,7 +758,7 @@ fun currencyExchange()
         val exchangeAmount = sourceAmount * sourceRate / exchangeRate // main output
         println("Exchange Amount: ${String.format("%.2f", exchangeAmount)}")
 
-        print("\nConvert another currency (Y/N)? ")
+        print("\nExchange another currency? (Y/N): ")
         if (readln().trim().lowercase() != "y")
         {
             return //stop function
@@ -770,92 +768,120 @@ fun currencyExchange()
 
 fun recordExchange()
 {
-    println(divider)
-    println(" ~~~ Record Exchange Rates")
-    println(divider)
-
-    println("[1] Philippine Peso (PHP)")
-    println("[2] United States Dollar (USD)")
-    println("[3] Japanese Yen (JPY)")
-    println("[4] British Pound Sterling (GBP)")
-    println("[5] Euro (EUR)")
-    println("[6] Chinese Yuan Renminni (CNY)\n")
-
-    print("Select Currency: ")
-    val choice = readln().trim().toIntOrNull()
-
-    if (choice == null || choice !in 1..6)
-    {
-        println("Error: Invalid choice.")
-        return
-    }
-
     while (true)
     {
-        print("Exchange Rate: ")
-        val rate = readln().trim().toDoubleOrNull()
+        println("\n$divider")
+        println("~~~ Record Exchange Rates")
+        println(divider)
 
-        if (rate == null)
+        println("[1] Philippine Peso (PHP)")
+        println("[2] United States Dollar (USD)")
+        println("[3] Japanese Yen (JPY)")
+        println("[4] British Pound Sterling (GBP)")
+        println("[5] Euro (EUR)")
+        println("[6] Chinese Yuan Renminni (CNY)\n")
+
+        print("Select Currency: ")
+        val choice = readln().trim().toIntOrNull()
+
+        if (choice == null || choice !in 1..6)
         {
-            println("Error: Exchange rate must be numerical.")
-            continue
+            println("Error: Invalid choice.")
+            return
         }
 
-        if (!rate.isFinite() || rate <= 0)
+        while (true)
         {
-            println("Error: Exchange rate must be greater than zero.")
-            continue
+            print("Exchange Rate: ")
+            val rate = readln().trim().toDoubleOrNull()
+
+            if (rate == null)
+            {
+                println("Error: Exchange rate must be numerical.")
+                continue
+            }
+
+            if (!rate.isFinite() || rate <= 0)
+            {
+                println("Error: Exchange rate must be greater than zero.")
+                continue
+            }
+
+            currencyRates[choice - 1] = rate // set the new exchange rate
+            println("Exchange rate recorded successfully.")
+            break
         }
 
-        currencyRates[choice - 1] = rate // set the new exchange rate
-        println("Exchange rate recorded successfully.")
-        return
+        while (true)
+        {
+            print("Record another exchange rate? (Y/N): ")
+            when (readln().trim().lowercase())
+            {
+                "y" -> break
+                "n" -> return
+                else -> println("Please enter Y or N.")
+            }
+        }
     }
 }
 
 fun showInterest()
 {
-    println(divider)
-    println(" ~~~ Show Interest Amount")
-    println(divider)
-
-    // ask for the account number and check that it exists in the CSV
-    val index = askAccount()
-    if (index == -1)
-    {
-        return    // not found, back to the main menu
-    }
-    val account = transactionList[index]
-
-    println("Account Name: ${account.name}")
-    println("Current Balance: ${"%,.2f".format(account.balance)}")
-    println("Currency: PHP")
-    println("Interest Rate: 5%")
-
-    // ask for the number of days until it's a valid whole number above 0
-    val days: Int
     while (true)
     {
-        print("Total Number of Days: ")
-        val input = readln().trim().toIntOrNull()
+        println("\n$divider")
+        println("~~~ Show Interest Amount")
+        println(divider)
 
-        if (input == null || input <= 0)
+        // ask for the account number and check that it exists in the CSV
+        val index = askAccount()
+        if (index == -1)
         {
-            println("Error: Number of days must be a whole number greater than zero.")
-            continue
+            return    // not found, back to the main menu
         }
-        days = input
-        break
-    }
+        val account = transactionList[index]
 
-    var newBalance = account.balance
-    println("\n| Day |     Interest |          Balance |")
-    for (i in 1..days)
-    {
-        val interest = account.balance * 0.05 / 365
-        newBalance += interest
+        println("Account Name: ${account.name}")
+        println("Current Balance: ${"%,.2f".format(account.balance)}")
+        println("Currency: PHP")
+        println("Interest Rate: 5%")
 
-        println("| ${"%3d".format(i)} | ${"%,12.2f".format(interest)} | ${"%,16.2f".format(newBalance)} |")
+        // ask for the number of days until it's a valid whole number above 0
+        val days: Int
+        while (true)
+        {
+            print("Total Number of Days: ")
+            val input = readln().trim().toIntOrNull()
+
+            if (input == null || input <= 0)
+            {
+                println("Error: Number of days must be a whole number greater than zero.")
+                continue
+            }
+            days = input
+            break
+        }
+
+        var newBalance = account.balance
+        println("\n| Day |     Interest |          Balance |")
+        for (i in 1..days)
+        {
+            val interest = account.balance * 0.05 / 365
+            newBalance += interest
+
+            println("| ${"%3d".format(i)} | ${"%,12.2f".format(interest)} | ${"%,16.2f".format(newBalance)} |")
+        }
+
+        while (true)
+        {
+            print("Compute interest amount again? (Y/N): ")
+            when (readln().trim().lowercase())
+            {
+                "y" -> break
+                "n" -> return
+                else -> println("Please enter Y or N.")
+            }
+        }
     }
 }
 
@@ -922,8 +948,9 @@ fun generate()
         return
     }
 
+    println("\n$divider")
+    println("~~~ Generating reports / outputting to CSV files...")
     println(divider)
-    println("~~~ Generating reports / outputting to CSV files...\n")
 
     report1()
     report2()
@@ -936,8 +963,8 @@ fun generateReports()
 {
     while (true)
     {
-        println(divider)
-        println(" ~~~ Generate Reports")
+        println("\n$divider")
+        println("~~~ Generate Reports")
         println(divider)
 
         println("[1] Load File")
@@ -948,12 +975,12 @@ fun generateReports()
 
         when (choice)
         {
-            "1" -> readFile()
+            "1" -> readFile(showSummary = true)
             "2" -> generate()
             else -> println("Error: Invalid choice. Please enter 1 to 2.")
         }
 
-        if (!backToMainMenu())
+        if (backToMainMenu())
         {
             return
         }
@@ -964,7 +991,7 @@ fun backToMainMenu(): Boolean
 {
     while (true)
     {
-        print("\nBack to the Main Menu (Y/N): ")
+        print("\nBack to Main Menu (Y) Retry Process (N): ")
         when (readln().trim().lowercase())
         {
             "y" -> return true
@@ -976,13 +1003,10 @@ fun backToMainMenu(): Boolean
 
 fun main()
 {
-    readFile()    // load the CSV once at the start
-
-    var running = true
-    while (running)
+    while (true)
     {
-        println(divider)
-        println(" Main Menu")
+        println("\n$divider")
+        println("~~~ Main Menu")
         println(divider)
 
         println("Select Transaction:")
@@ -993,26 +1017,48 @@ fun main()
         println("[5] Record Exchange Rates")
         println("[6] Show Interest Amount")
         println("[7] Generate Reports")
+        println("[8] Exit")
         print("Enter choice: ")
 
-        val choice = readLine()!!.trim()
+        val choice = readln().trim()
 
-        when (choice)
-        {
-            "1" -> register()
-            "2" -> deposit()
-            "3" -> withdraw()
-            "4" -> currencyExchange()
-            "5" -> recordExchange()
-            "6" -> showInterest()
-            "7" -> generateReports()
-            else -> println("Invalid choice. Please enter 1 to 7.")
-        }
-
-        if (!backToMainMenu())
+        if (choice == "8")
         {
             println("Exiting the program. Goodbye!")
-            running = false
+            return
         }
+
+        if (choice == "7")
+        {
+            generateReports()
+            continue
+        }
+
+        if (choice !in listOf("1", "2", "3", "4", "5", "6"))
+        {
+            println("Invalid choice. Please enter 1 to 8.")
+            continue
+        }
+
+        while (true)
+        {
+            readFile()
+
+            when (choice)
+            {
+                "1" -> register()
+                "2" -> deposit()
+                "3" -> withdraw()
+                "4" -> currencyExchange()
+                "5" -> recordExchange()
+                "6" -> showInterest()
+            }
+
+            if (backToMainMenu())
+            {
+                break
+            }
+        }
+
     }
 }
