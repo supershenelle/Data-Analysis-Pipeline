@@ -646,6 +646,7 @@ public class MainMenu{
                     reports.report2();
                     reports.report3();
                     reports.report4();
+                    reports.summary();
 
                     exit();
                     return;
