@@ -109,7 +109,7 @@ public class Reports{
         for(String line: content){
             String[] parts = line.split("\""); 
             String row = "";
-            for(int j=0; j<parts.length; j++)
+            for(int j=0; j<parts.length; j++){
                 if(j%2 == 0){
                     row +=parts[j].replace(",", ";");
                 } else {
