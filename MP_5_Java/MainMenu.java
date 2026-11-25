@@ -16,8 +16,8 @@ import java.util.*;
  * and currency conversion to the ExchangeRate class.
  */
 public class MainMenu{
-    private Scanner sc = new Scanner(System.in);
     private Account account;
+    private Scanner sc = new Scanner(System.in);
     private ExchangeRate exchangeRate = new ExchangeRate();
     private ArrayList<Account> accounts = new ArrayList<>();
     private ArrayList<TransactionRecords.Transaction> transactions = new ArrayList<>();
@@ -58,13 +58,13 @@ public class MainMenu{
     }
 
     /**
-     * Searches the account list for the given account number
-     * @param accNum represents the account number to look for
+     * Searches the account list for the given account name
+     * @param name represents the account name to look for
      * @return the matching Account, or null if nothing exists.
      */
-    public Account findAccount(long accNum){
+    public Account findAccount(String name){
         for(Account a: accounts){
-            if(a.getAccountNumber() == accNum){
+            if(a.getAccountName().equalsIgnoreCase(name)){
                 return a;
             }
         }
@@ -74,8 +74,7 @@ public class MainMenu{
 
 
     /**
-     * Loads every saved valid account thats read from bank_transactions.csv 
-     * into the accounts arraylist.
+     * Loads every saved valid account thats read from bank_transactions.csv into the accounts arraylist.
      * The balance of each account is based on the user's most recent transaction.
      */
     public void loadAccounts(){
@@ -85,7 +84,7 @@ public class MainMenu{
         // This portion is to set the user's balance based on their recent transaction
         for(TransactionRecords.Transaction t: rows){
             // Checks if the account from a row already exists
-            Account existing = findAccount(t.accountNumber());
+            Account existing = findAccount(t.accountName());
 
 
             // if not yet, adds to the list muna and creates a new account object
@@ -156,13 +155,12 @@ public class MainMenu{
      * or ends with an initial, such as Juan D., Dela Cruz, Juan, Julio
      */
     public boolean isValidName(String name){
-        // Rejects if empty or may comma
+        // Rejects if empty input or contains a comma
         if(name.isEmpty() || name.contains(",")){
             return false;
         }
 
-        // split entered name into substrings of names
-        // since each name will be checked individually
+        // splits into substring of names since it will be checked individually
         String[]names = name.split("\\s+");
         int fullNames = 0;
 
@@ -182,11 +180,11 @@ public class MainMenu{
     }
 
     /**
-     * Simulates account registration with validation.
+     * Simulates account registration with validation. User's account number is updated based on last number generated
      */
     public void registerAccount(){
         // asks for name and initial deposit
-        // creates a new instance and adds to accounts
+        // creates a new instance and adds to accounts list
         // writes to the csv file since it is a transaction
 
         boolean registerAgain = true;
@@ -201,10 +199,14 @@ public class MainMenu{
             while(!isValid){
                 System.out.print("Account Name: ");
                 name = sc.nextLine().trim();
-                isValid = isValidName(name); // validates name
 
-                if(!isValid){ // if not true
+                // checks if valid or if already exists
+                if(!isValidName(name)){
                     System.out.println("Error: Invalid Name.");
+                } else if(findAccount(name) != null){
+                    System.out.println("Error: Account name already exists.");
+                } else{
+                    isValid = true;
                 }
             }
 
@@ -244,16 +246,18 @@ public class MainMenu{
 
     /**
      * Asks whether to return to the main menu and loops until valid input (Y/N).
+     * @param prompt is the string prompt for given transaction.
+     * @return true if user will exit and false otherwise.
      */
     public boolean exit(String prompt){
         while (true){
             System.out.print(prompt);
             String choice = sc.nextLine().trim().toUpperCase();
 
-            if(choice.equals("N") || choice.equals("n")){
+            if(choice.equals("N")){
                 return false;
             }
-            if(choice.equals("Y") || choice.equals("y")){
+            if(choice.equals("Y")){
                 return true;
             }
 
@@ -271,6 +275,9 @@ public class MainMenu{
 
     /**
      * This function appends a user's transaction to the CSV file
+     * @param acc represents the account to append
+     * @param type represents the transaction type to append (withdraw/deposit)
+     * @param amount represents the transacted amount to append.
      */
     public void appendTransactionToCsv(Account acc, String type, double amount){
         // gets today's date and current time during transaction
@@ -289,22 +296,23 @@ public class MainMenu{
 
     /** 
      * Simulates the deposit transaction.
-     * Reads amount, exchanges currency, and updates balance accordingly.
+     * Reads amount, exchanges currency, updates balance, and appends transaction accordingly.
      */
     public void depositAmount(){
 
         boolean depositAgain = true;
 
         while(depositAgain){
-            long accountNum = readAccountNum("Account Number: ");
-            account = findAccount(accountNum);
+            System.out.print("Account Name: ");
+            String name = sc.nextLine().trim();
+            account = findAccount(name);
 
             if (account == null){
                 System.out.println("Error: Account not found.");
                 System.out.println();
                 depositAgain = exit("Deposit another amount? (Y/N): ");
                 clearScreen();
-                continue; // skips the rest so it loops again
+                continue; // skips the rest if no account so it loops again
             }
 
             // Displays information
@@ -376,8 +384,7 @@ public class MainMenu{
     }
 
     /**
-     * Validating for amount entered by user, continues to prompt until a numerical
-     * and positive value is inputted.
+     * Validating for amount entered by user, continues to prompt until a numerical and positive value is inputted.
      * @param prompt represents the prompt to be displayed to the user.
      * @return the valid positive amount to be transacted.
      */
@@ -396,31 +403,6 @@ public class MainMenu{
 
             } catch (InputMismatchException e) {
                 System.out.println("Error: Invalid Amount");
-                sc.nextLine();
-            }
-        }
-    }
-
-    /**
-     * Similar to readAmount, validating for long entered by user. Continues
-     * to prompt until a positive integer is inputted.
-     * @param prompt represents the prompt shown to user.
-     * @return the valid positive integer.
-     */
-    public long readAccountNum(String prompt){
-        while(true){
-            try{
-                System.out.print(prompt);
-                long value = sc.nextLong();
-                sc.nextLine();
-
-                if(value > 0){
-                    return value;
-                }
-
-                System.out.println("Error: Account number must be positive");
-            } catch (InputMismatchException e){
-                System.out.println("Error: Invalid account number");
                 sc.nextLine();
             }
         }
@@ -453,15 +435,16 @@ public class MainMenu{
 
     /** 
      * Simulates the withdraw transaction.
-     * Reads amount and updates balance accordingly.
+     * Reads amount and updates balance, and appends to the csv file accordingly.
      */
     public void withdrawAmount(){
 
         boolean withdrawAgain = true;
 
         while(withdrawAgain){      
-            long accountNum = readAccountNum("Account Number: ");
-            account = findAccount(accountNum);
+            System.out.print("Account Name: ");
+            String name = sc.nextLine().trim();
+            account = findAccount(name);
      
             if (account == null){
                 System.out.println("Error: No account found.");
@@ -532,15 +515,7 @@ public class MainMenu{
      * @return the corresponding Currency.
      */
     public Currency choiceToCurrency(int choice){
-        switch(choice){
-            case 1: return Currency.PHP;
-            case 2: return Currency.USD;
-            case 3: return Currency.JPY;
-            case 4: return Currency.GBP;
-            case 5: return Currency.EUR;
-            case 6: return Currency.CNY;
-            default: return Currency.PHP;
-        }
+        return Currency.values()[choice-1];
     }
 
     /**
@@ -567,6 +542,7 @@ public class MainMenu{
             System.out.println("Source Currency Option:");
             showCurrencies();
 
+            // Check if input is valid
             int c1 = ifChoiceValid(6, 1, "Source Currency: ");
             Currency sourceCurr = choiceToCurrency(c1);
             double sourceAmt = readAmount("Source Amount: ");
@@ -588,24 +564,8 @@ public class MainMenu{
                 System.out.printf("Exchange Amount: %.2f\n", exchangeRate.convert(sourceAmt, sourceCurr, exchangeCurr));
             }
 
-            boolean convertAgain = false;
             System.out.println();
-
-            while(!convertAgain){
-                System.out.print("Convert another currency (Y/N)? . . . ");
-                String choice = sc.nextLine().trim().toUpperCase();
-
-                if(choice.equals("Y")){
-                    willConvert = true;
-                    convertAgain = true;
-
-                } else if(choice.equals("N")){
-                    willConvert = false;
-                    convertAgain = true;
-                } else{
-                    System.out.println("Error: Invalid Choice");
-                }
-            }
+            willConvert = exit("Convert another currency (Y/N)? . . . ");
 
             if(willConvert){
                 clearScreen();
@@ -620,8 +580,9 @@ public class MainMenu{
      */
     public void showInterest(){
 
-        long accountNum = readAccountNum("Account Number: ");
-        account = findAccount(accountNum);
+        System.out.print("Account Name: ");
+        String name = sc.nextLine().trim();
+        account = findAccount(name);
 
          if (account == null){
             System.out.println("Error: No account found.");
@@ -651,6 +612,9 @@ public class MainMenu{
         exit();
     }
 
+    /**
+     * This function is used to compile all functions to generate all 4 reports on csv files
+     */
     public void generateReports(){
         while(true){
             System.out.println("Generate Reports");
@@ -662,20 +626,30 @@ public class MainMenu{
 
             if(choice == 1){
                 transactions = TransactionRecords.loadTransactions();
+                // incase file was empty
+                if(transactions.isEmpty()){
+                    System.out.println("Error: No transactions loaded.");
+                }
                 System.out.println();
-            } else{
-                System.out.println("Generating reports...");
-                System.out.println("Outputs saved to individual files...");
-                System.out.println();
-                
-                Reports reports = new Reports(transactions, accounts);
-                reports.report1();
-                reports.report2();
-                reports.report3();
-                reports.report4();
+            } else {
+                // incase di pa naload
+                if(transactions.isEmpty()){
+                    System.out.println("Error: Load file first");
+                    continue;
+                } else{
+                    System.out.println("Generating reports...");
+                    System.out.println("Outputs saved to individual files...");
+                    System.out.println();
+                    
+                    Reports reports = new Reports(transactions);
+                    reports.report1();
+                    reports.report2();
+                    reports.report3();
+                    reports.report4();
 
-                exit();
-                return;
+                    exit();
+                    return;
+                }
             }
         }
     }
