@@ -4,7 +4,7 @@
 # Paradigm(s): Procedural
 #
 ######################################
-#
+#------------------------------ INSTRUCTIONS -------------------------------#
 # TO RUN THIS PROGRAM SA VSCODE USE ctrl + shift + S kasi di gumagana read line if hindi
 # DONT FORGET NA AYUSIN DIRECTORY PARA MAACCESS FILE (getwd() to check cur dir) 
 # setwd("C:/Users/mavrick de guzman/Downloads/adprg mco2")
@@ -126,6 +126,7 @@ askConvertAnother <- function() {
 }
 
 # Generates the next available account number.
+# @return(nextNumber) The next available account number.
 generateAccountNumber <- function(file = "bank_transactions.csv") {
 
     if (file.exists(file)) {
@@ -140,6 +141,9 @@ generateAccountNumber <- function(file = "bank_transactions.csv") {
     return(nextNumber)
 }
 
+# This function finds and selects an existing bank account using account name
+# @param file of CSV file containing bank transactions
+# @return (list) A list containing accountName, accountNumber, and balance;
 selectAccount <- function(file = "bank_transactions.csv") {
 
     # check if CSV file exists
@@ -155,25 +159,25 @@ selectAccount <- function(file = "bank_transactions.csv") {
     while(TRUE) {
         accountName <- trimws(readline("Account Name: "))
 
-        # Find matching account.
+        # find yng matching account
         accountRows <- which(
             tolower(trimws(data$account_name)) == tolower(accountName)
         )
 
-        # Check if account exists.
+        # check if account exists
         if(length(accountRows) == 0) {
             cat("Error: Account not found.\n\n")
             next
         }
 
-        # Get the latest transaction.
+        # get latest transaction
         latestRecord <- data[tail(accountRows, 1), ]
 
-        # Display current balance.
+        # Display current balance (for checking lng)
         #cat("Account Name:", latestRecord$account_name, "\n")
         #cat(sprintf("Current Balance: PHP %.2f\n", latestRecord$current_balance))
 
-        # Return account information.
+        # return account information
         return(list(
             accountName = latestRecord$account_name,
             accountNumber = as.character(latestRecord$account_number),
@@ -181,43 +185,11 @@ selectAccount <- function(file = "bank_transactions.csv") {
         ))
     }
 
-    # # ask for account number
-    # while(TRUE) {
-    #     accountNumber <- trimws(readline("Enter Account Number: "))
-
-    #     # Find matching account.
-    #     accountRows <- which(as.character(data$account_number) == accountNumber)
-
-    #     # Check if account has match
-    #     if(length(accountRows) == 0) {
-    #         cat("Error: Account not found.\n")
-    #         next
-    #     }
-
-    #     # Get the latest transaction (last index) data[row, col]
-    #     latestRecord <- data[tail(accountRows, 1), ]
-
-    #     # Display account details.
-    #     #cat("\nAccount Found!\n")
-    #     #cat("Account Name:", latestRecord$account_name, "\n")
-    #     #cat("Account Number:", latestRecord$account_number, "\n")
-
-    #     cat(sprintf(
-    #         "Current Balance: PHP %.2f\n",
-    #         latestRecord$current_balance
-    #     ))
-
-    #     # Return account information.
-    #     return(list(
-    #         accountName = latestRecord$account_name,
-    #         accountNumber = accountNumber,
-    #         balance = latestRecord$current_balance
-    #     ))
-    # }
 }
 
 # This function registers a new account 
 # It loops until a non-blank name is entered and stores it in the Account struct.
+# @param file of CSV file containing bank transactions
 # @return (accountName) The name of the account holder.
 registerAccount <- function(file = "bank_transactions.csv") {
     loop <- "Y"
@@ -263,7 +235,6 @@ registerAccount <- function(file = "bank_transactions.csv") {
                 break
             }    
         }
-
 
 
         # get curr time and date
@@ -312,11 +283,9 @@ registerAccount <- function(file = "bank_transactions.csv") {
 
 
 # This function handles the deposit process.
-# It displays the current balance, takes a deposit amount, validates it, and updates the account balance.
-# @param accountName The name of the account holder.
-# @param balance The current balance of the account.
-# @param accountCurrency The index of the currency in CURRENCY_CODES
-# @return (newbalance) The updated balance after deposit.
+# It gets the account information, displays the current balance, takes a deposit amount, validates it, and updates the account balance.
+# @param (rates) A numeric vector containing the exchange rates for each currency.
+# @param file of CSV file containing bank transactions
 depositAmount <- function(rates, file = "bank_transactions.csv"){
     cat("\nDeposit Amount\n")
 
@@ -438,12 +407,9 @@ depositAmount <- function(rates, file = "bank_transactions.csv"){
 
 
 # This function handles the withdrawal process.
-# It displays the current balance, takes a withdrawal amount, validates it, checks for sufficient funds, 
+# It gets the account information, displays the current balance, takes a withdrawal amount, validates it, checks for sufficient funds, 
 # and updates the account balance.
-# @param accountName The name of the account holder.
-# @param balance The current balance of the account.
-# @param accountCurrency The index of the currency in CURRENCY_CODES.
-# @return (newbalance) The updated balance after withdrawal.
+# @param (rates) A numeric vector containing the exchange rates for each currency.
 withdrawAmount <- function(file = "bank_transactions.csv") {
     cat("\nWithdraw Amount\n")
 
@@ -683,9 +649,8 @@ recordExchange <- function(rates)
 # This function calculates and displays the expected daily interest over N days.
 # It displays the current account details, takes the number of days, and prints
 # a formatted table showing the day, interest earned, and running balance.
-# @param accountName The name of the account holder.
-# @param balance The current balance of the account.
-# @param accountCurrency The index of the currency in CURRENCY_CODES.
+# @param file that contains the bank transactions in CSV format.
+
 # @return (void)
 showInterestAmount <- function(file = "bank_transactions.csv"){
     cat("Show Interest Amount\n")
@@ -734,7 +699,10 @@ showInterestAmount <- function(file = "bank_transactions.csv"){
     cat("\n")
 }
 
-# load, validates, and clean file data
+# load, validates, and clean bank transaction data file. 
+# It checks that the CSV file and required columns exist, converts columns to
+# the appropriate data types, removes rows with missing or invalid values,
+# and keeps valid transactions recorded in Philippine pesos (PHP).
 loadFileData <- function(file = "bank_transactions.csv") {
 
     cat("\nProcessing dataset...\n")
@@ -784,7 +752,6 @@ loadFileData <- function(file = "bank_transactions.csv") {
      #cat(sprintf("Rows with missing or invalid values: %s", format(sum(invalidRows), big.mark = ",")))
 
 
-
     # Get the original row numbers of PHP transactions.
     phpRows <- which(!is.na(data$currency) & data$currency == "PHP")
 
@@ -800,6 +767,8 @@ loadFileData <- function(file = "bank_transactions.csv") {
 }
 
 # displays generate reports menu
+# It allows the user to load and validate the transaction file, generate
+# Reports 1 to 4 and the JSON summary, or return to the main menu
 generateReports <- function() {
 
     bankData <- NULL
@@ -850,6 +819,12 @@ generateReports <- function() {
 
 
 # generates Banking Privilege Tiers
+# It calculates each account's age, current balance, and average daily balance
+# for the previous month, assigns a privilege tier to qualifying accounts,
+# sorts the results by average daily balance, and exports the report to CSV.
+# @param data contains data frame containing validated PHP bank transactions.
+# @return (report) A data frame containing accounts that qualify for a
+# privilege tier, sorted by average daily balance in descending order.
 generateReport1 <- function(data) {
 
     # get previous month's start and end dates
@@ -965,6 +940,12 @@ generateReport1 <- function(data) {
 }
 
 #generate Report 2: Interest Expense Projection
+# It finds each account's latest balance, calculates its expected interest
+# for 30 days when the balance is at least PHP 10,000, sorts the results by
+# expected interest in descending order, and exports the report to CSV.
+# @param data A data frame containing validated PHP bank transactions.
+# @return (report) A data frame containing qualifying accounts and their
+# projected interest, sorted from highest to lowest
 generateReport2 <- function(data) {
 
     # Sort transactions by date and time (oldest first)
@@ -1032,6 +1013,12 @@ generateReport2 <- function(data) {
 
 
 # generate Report 3: Suspicious Client Behavior
+# It examines each account's transactions for each date, calculates total
+# withdrawals, total deposits, number of deposits, and turnover velocity,
+# assigns a risk flag, sorts the results, and exports the report to CSV.
+# @param data A data frame containing validated PHP bank transactions.
+# @return (report) A data frame containing the daily transaction activity
+# and risk flag for each account.
 generateReport3 <- function(data) {
 
     # Get all unique account and date combinations
@@ -1127,6 +1114,12 @@ generateReport3 <- function(data) {
 }
 
 # generate Report 4: Top Depositors
+# It calculates each account's total deposits, number of deposits, and
+# average deposit, sorts accounts by total deposits, selects the top 10,
+# and exports the results to CSV.
+# @param data A data frame containing validated PHP bank transactions.
+# @return (topDepositors) A data frame containing up to 10 accounts with
+# the highest total deposit amounts.
 generateReport4 <- function(data) {
 
     # get all unique account numbers
@@ -1201,7 +1194,14 @@ generateReport4 <- function(data) {
     return(topDepositors)
 }
 
-# produce a summary.json
+
+# This function generates the overall banking summary and produce a summary.json
+# It calculates the total number of accounts, total deposits, total
+# withdrawals, combined current balance, and projected interest expense,
+# then saves these values in summary.json and displays them in the console.
+# @param data A data frame containing validated PHP bank transactions.
+# @param report2 A data frame returned by generateReport2(), containing
+# the expected interest for qualifying accounts.
 generateSummary <- function(data, report2) {
     cat("\nSummary State (summary.json)\n")
 
