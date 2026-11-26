@@ -14,7 +14,7 @@ public class Reports{
 
     private LocalDate today;
     private double totalInterest = 0;
-    private HashMap<Long, ArrayList<TransactionRecords.Transaction>> byAccount = new HashMap<>(); // hashmap that maps each account number to their list of transactions
+    private Map<Long, ArrayList<TransactionRecords.Transaction>> byAccount = new LinkedHashMap<>(); // linked hashmap that maps each account number to their list of transactions, maintaining load order
 
     // records that represent a line in each respective report
     public record TierPerAcc(String name, long age, double balance, double avg, String tier){} // record that represents info of report1
