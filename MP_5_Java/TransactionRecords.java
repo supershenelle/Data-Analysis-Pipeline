@@ -62,7 +62,7 @@ public class TransactionRecords{
                 String[] columns = row.trim().split(",");
 
                 // Checks muna if complete laman ng row
-                if(columns.length < 8){
+                if(columns.length != 8){
                     invalidRows++;
                     continue;
                 }
