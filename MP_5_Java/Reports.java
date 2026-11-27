@@ -12,9 +12,9 @@ import java.util.*;
  */
 public class Reports{
 
-    private LocalDate latestDate; // newest date sa file
+    private LocalDate today;
     private double totalInterest = 0;
-    private HashMap<Long, ArrayList<TransactionRecords.Transaction>> byAccount = new HashMap<>(); // hashmap that maps each account number to their list of transactions
+    private Map<Long, ArrayList<TransactionRecords.Transaction>> byAccount = new LinkedHashMap<>(); // linked hashmap that maps each account number to their list of transactions, maintaining load order
 
     // records that represent a line in each respective report
     public record TierPerAcc(String name, long age, double balance, double avg, String tier){} // record that represents info of report1
@@ -30,8 +30,7 @@ public class Reports{
      */
     public Reports(ArrayList<TransactionRecords.Transaction> rows){
 
-        // gets the date in the first row
-        latestDate = rows.get(0).date();
+        today = LocalDate.now(); // gets current date
 
         // goes thru every row to get latest date and fill the hashmap
         for(TransactionRecords.Transaction t: rows){
@@ -44,11 +43,6 @@ public class Reports{
                 byAccount.put(t.accountNumber(), new ArrayList<>());
             }
             byAccount.get(t.accountNumber()).add(t);
-
-            // This gets the latest date from all the transactions
-            if(t.date().isAfter(latestDate)){
-                latestDate = t.date();
-            }
         }
     }
 
@@ -93,7 +87,7 @@ public class Reports{
     /**
      * This function creates the preview table for each report generated
      * @param header is a string that represents the header of the report.
-     * @param lines is a string that represents each row/line written on the report.
+     * @param lines is an arraylist of strings that represents the rows written on the report.
      */
     public void printPreviewTable(String header, ArrayList<String> lines){
         
@@ -147,9 +141,10 @@ public class Reports{
         ArrayList<TierPerAcc> tierRecords = new ArrayList<>(); // creates a list of tierRecords/ rows to in the file
 
         // data of latest date sa files
-        int year = latestDate.getYear();
-        int month = latestDate.getMonthValue();
-        int daysInMonth = latestDate.lengthOfMonth();
+        YearMonth lastMonth = YearMonth.from(today).minusMonths(1);
+        int year = lastMonth.getYear();
+        int month = lastMonth.getMonthValue();
+        int daysInMonth = lastMonth.lengthOfMonth();
 
         // Goes through every account and computes required info
         for(ArrayList<TransactionRecords.Transaction> list: byAccount.values()){
@@ -179,7 +174,7 @@ public class Reports{
 
             // To determine account tier
             if(avg >= 100000){
-                long age = latestDate.toEpochDay() - first.date().toEpochDay();
+                long age = today.toEpochDay() - first.date().toEpochDay();
                 String tier;
                 if(avg < 500000){
                     tier = "Silver";
@@ -211,6 +206,7 @@ public class Reports{
      * to compute for their expected interest alongside the the required information to be appended on the csv file.
      */
     public void report2(){
+        totalInterest = 0;
         System.out.println("Report 2: Interest Expense Projection");
         ArrayList<InterestPerUser> interestRecords = new ArrayList<>();
         Interest ints = new Interest();
@@ -249,6 +245,7 @@ public class Reports{
         // Iterates through every arraylist owned by an account
         for(ArrayList<TransactionRecords.Transaction> list: byAccount.values()){
             int i = 0;
+            // sums up the user's transactions in one day, so considered as a whole sya
             while(i < list.size()){
                 LocalDate date = list.get(i).date(); // gets date of this list
                 double totalWithdrawalAmounts = 0;
@@ -306,6 +303,7 @@ public class Reports{
             formatMoney(r.totalDepositAmounts()) + "," + formatMoney(r.turnoverVelocity()) + "," + r.riskFlagLevel());
         }
 
+        // puts same day transactions into one row
         reportsOnCsv("report3_suspicious_client_behavior.csv", "AccountName,Date,TotalWithdrawalAmounts,NumberOfDeposits,TotalDepositAmounts,TurnoverVelocity,RiskFlagLevel", lines);
     
     }
@@ -319,8 +317,9 @@ public class Reports{
         ArrayList<TopUser> topUsers = new ArrayList<>();
 
         // gets year and month of current date
-        int year = latestDate.getYear();
-        int month = latestDate.getMonthValue();
+        YearMonth lastMonth = YearMonth.from(today).minusMonths(1);
+        int year = lastMonth.getYear();
+        int month = lastMonth.getMonthValue();
         int activityCount;
 
         for(ArrayList<TransactionRecords.Transaction> list: byAccount.values()){
@@ -382,5 +381,6 @@ public class Reports{
 
         System.out.println("Summary State (summary.json):");
         System.out.println(jsonOutput);
+        System.out.println();
     }
 }

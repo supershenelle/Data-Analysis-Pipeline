@@ -125,8 +125,7 @@ public class MainMenu{
         while(true){
             try {
             System.out.print(prompt);
-            int choice = sc.nextInt();
-            sc.nextLine();
+            int choice = Integer.parseInt(sc.nextLine().trim());
 
             if(choice >= lo && choice <= hi){
                 return choice;
@@ -134,9 +133,8 @@ public class MainMenu{
             
             System.out.println("Error: Invalid choice");
 
-            } catch (InputMismatchException e) {
+            } catch (NumberFormatException e) {
                 System.out.println("Error: Invalid choice");
-                sc.nextLine();
             }
         }
     }
@@ -392,8 +390,7 @@ public class MainMenu{
         while(true){
             try {
                 System.out.print(prompt);
-                double amount = sc.nextDouble();
-                sc.nextLine();
+                double amount = Double.parseDouble(sc.nextLine().trim());
 
                 if(amount > 0){
                     return amount;
@@ -401,9 +398,8 @@ public class MainMenu{
 
                 System.out.println("Error: Amount must be positive");
 
-            } catch (InputMismatchException e) {
+            } catch (NumberFormatException e) {
                 System.out.println("Error: Invalid Amount");
-                sc.nextLine();
             }
         }
     }
@@ -418,17 +414,15 @@ public class MainMenu{
         while(true){
             try{
                 System.out.print(prompt);
-                int value = sc.nextInt();
-                sc.nextLine();
+                int value = Integer.parseInt(sc.nextLine().trim());
 
                 if(value > 0){
                     return value;
                 }
 
                 System.out.println("Error: Input must be positive");
-            } catch (InputMismatchException e){
+            } catch (NumberFormatException e){
                 System.out.println("Error: Invalid Input");
-                sc.nextLine();
             }
         }
     }
