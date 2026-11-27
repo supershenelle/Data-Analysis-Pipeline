@@ -1,4 +1,4 @@
-/*************************** 
+/***************************
 Last names: Danieles, De Guzman, Nono, Suazon
 Language: C
 Paradigm(s): Procedural, Imperative, Structured
@@ -8,6 +8,7 @@ Paradigm(s): Procedural, Imperative, Structured
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 
 #define MAX_NAME 100
 #define DEFAULT_BALANCE 0.00
@@ -16,6 +17,7 @@ Paradigm(s): Procedural, Imperative, Structured
 
 #define MAX_CURR 8
 #define MAX_TYPE 16
+#define MAX_TIME 16
 #define START_SIZE 1024
 #define CSV_FILE "bank_transactions.csv"
 
@@ -59,12 +61,15 @@ typedef struct{
 
 /*
 * Structure representing a user's transaction.
+* Holds the account name, account number, full date and time, currency,
+* amount, transaction type, and the resulting balance after the transaction.
 */
 typedef struct{
     char account_name[MAX_NAME];
     long account_number;
     int day, month, year;
     int hour, minute, second;
+    char time_str[MAX_TIME];
     char currency[MAX_CURR];
     double amount;
     char type[MAX_TYPE];
@@ -72,7 +77,9 @@ typedef struct{
 } Transaction;
 
 /*
-* What load_transactions() returns.
+* Structure representing the result of load_transactions().
+* Holds the dynamic list of PHP transactions plus counters for
+* total rows read, valid PHP rows, invalid rows, and skipped non-PHP rows.
 */
 typedef struct{
     Transaction* list;
@@ -83,7 +90,9 @@ typedef struct{
 } LoadResult;
 
 /*
-* What load_transactions() returns.
+* Structure representing one row of Report 1 (Banking Privilege Tiers).
+* Holds the account name, account number, age in days, current balance,
+* average daily balance, and the assigned privilege tier.
 */
 typedef struct{
     char acc_name[MAX_NAME];
@@ -95,7 +104,8 @@ typedef struct{
 } PrivilegeAccount;
 
 /*
-* one row of report 2
+* Structure representing one row of Report 2 (Interest Expense Projection).
+* Holds the account name, current balance, and the projected 30-day interest.
 */
 typedef struct{
     char name[MAX_NAME];
@@ -104,7 +114,10 @@ typedef struct{
 } InterestRow;
 
 /*
-* one row of report 3
+* Structure representing one row of Report 3 (Suspicious Client Behavior).
+* Holds the account name, account number, transaction date, aggregated
+* withdrawals and deposits, turnover velocity, risk flag, and the original
+* insertion index used to emulate stable sort on ties.
 */
 typedef struct{
     char name[MAX_NAME];
@@ -115,6 +128,7 @@ typedef struct{
     double total_deposits;
     double turnover_velocity;
     char risk_flag[16];
+    int orig_index;        // stable sort emulation for tiebreak
 } DailySummary;
 
 //Function Prototypes for main transactions
@@ -143,10 +157,14 @@ void strip_newline(char* s);
 int  split_line(char* line, char* fields[], int max_fields);
 int  is_php(const char* s);
 
-//Function Prototypes for the reports
+//Function Prototypes for formatting and reports
+double round2(double val);
+void format_money(char* out, int out_size, double val);
+long date_to_days(int day, int month, int year);
 void showReportsMenu();
 void generateAllReports(LoadResult* data, Account* acct);
 int compare_date(int d1, int m1, int y1, int d2, int m2, int y2);
+int compare_datetime(int d1, int m1, int y1, const char* t1, int d2, int m2, int y2, const char* t2);
 int days_in_month(int month, int year);
 int comp_adb_desc(const void* a, const void* b);
 void report1_privelege_tiers(LoadResult* data);
@@ -162,10 +180,12 @@ void write_summary_json(LoadResult* data);
 /*
 * Main entry point of the program.
 * Initializes the account and exchange rate array, then runs the main menu loop.
-* @param (void)
+* If run with the "--reports" argument, it skips the menu and generates all reports directly.
+* @param (int) argc is the argument count.
+* @param (char**) argv is the argument vector.
 * @return (int) Returns 0 upon successful termination.
 */
-int main(){
+int main(int argc, char* argv[]){
     Account acct;
     acct.balance = DEFAULT_BALANCE;
     acct.currency = PHP;
@@ -173,6 +193,16 @@ int main(){
     strcpy(acct.accountName, "");
 
     double rates[6] = {1.0, 0, 0, 0, 0, 0};
+
+    // single command mode for report generation
+    if(argc > 1 && strcmp(argv[1], "--reports") == 0){
+        LoadResult data = load_transactions(CSV_FILE);
+        if(data.list != NULL){
+            generateAllReports(&data, &acct);
+            free_load_result(&data);
+        }
+        return 0;
+    }
 
     //main loop
     int running = 1;
@@ -202,7 +232,16 @@ int main(){
             case 7:
                 showReportsMenu();
                 break;
+            case 8:
+                running = 0;
+                break;
         }
+
+        // skip the back to menu prompt when the user chose to exit
+        if(running == 0){
+            break;
+        }
+
         char ans = askBackToMenu();
         if(ans == 'N' || ans == 'n'){
             running = 0;
@@ -295,12 +334,13 @@ void showMenu(){
     printf("[4] Currency Exchange\n");
     printf("[5] Record Exchange Rates\n");
     printf("[6] Show Interest Amount\n");
-    printf("[7] Generate Reports\n\n");
+    printf("[7] Generate Reports\n");
+    printf("[8] Exit\n\n");
 }
 
 /*
 * This function prompts the user for their menu choice.
-* It loops until a valid integer (1-7) is entered, then prints the *** echo.
+* It loops until a valid integer (1-8) is entered, then prints the *** echo.
 * @param (void)
 * @return (int) The valid integer choice entered by the user.
 */
@@ -309,13 +349,13 @@ int getChoice(){
     while(1){
         printf("Choice: ");
         if(readInt(&choice)){
-            if(choice >= 1 && choice <= 7){
+            if(choice >= 1 && choice <= 8){
                 printf("\n***\n");
                 printf("Choice = %d\n\n", choice);
                 clearScreen();
                 return choice;
             }
-            printf("Error: Invalid choice. Please enter a number from 1 to 7.\n\n");
+            printf("Error: Invalid choice. Please enter a number from 1 to 8.\n\n");
         } else {
             printf("Error: Invalid input. Please enter a number.\n\n");
         }
@@ -351,6 +391,7 @@ char askBackToMenu(){
 
 /*
 * This function asks the user if they want to convert another currency.
+* It loops until a valid Y/N character is entered.
 * @param (void)
 * @return (char) The validated character entered by the user.
 */
@@ -375,7 +416,11 @@ char askConvertAnother(){
 }
 
 /*
-* if name for registration is valid
+* This function checks whether the given name is valid for registration.
+* A valid name must have at least one space (first + last), must not start
+* or end with a space, and may only contain letters, spaces, periods, hyphens, and apostrophes.
+* @param (const char*) name is the account name to validate.
+* @return (int) Returns 1 if the name is valid, 0 otherwise.
 */
 int is_valid_name(const char* name){
     int i;
@@ -413,7 +458,12 @@ int is_valid_name(const char* name){
 }
 
 /*
-* from register account name but meron na storing sa csv file
+* This function handles the full account registration process.
+* It validates the account name, finds the highest existing account number
+* in the CSV file to assign the next one, validates the initial deposit,
+* and appends the opening deposit row to the CSV file.
+* @param (Account*) acct is a pointer to the user's Account struct.
+* @return (void)
 */
 void registerAccount(Account* acct){
     char name[MAX_NAME];
@@ -565,7 +615,13 @@ void registerAccount(Account* acct){
 }
 
 /*
-* to find an account in the csv file
+* This function searches the CSV file for the latest transaction row
+* belonging to the given account name and returns the account number
+* and current balance from that row.
+* @param (const char*) name is the account name to look up.
+* @param (long*) out_number is where the account number will be stored.
+* @param (double*) out_balance is where the latest balance will be stored.
+* @return (int) Returns 1 if the account was found, 0 otherwise.
 */
 int find_account(const char* name, long* out_number, double* out_balance){
     FILE* fp = fopen(CSV_FILE, "r");
@@ -590,7 +646,7 @@ int find_account(const char* name, long* out_number, double* out_balance){
         if(strcmp(fields[0], name) == 0){
             *out_number = strtol(fields[1], NULL, 10);
             *out_balance = strtod(fields[7], NULL);
-            found = 1;   // keep scanning — later rows are newer
+            found = 1;   // keep scanning bcs later rows are newer
         }
     }
 
@@ -599,7 +655,14 @@ int find_account(const char* name, long* out_number, double* out_balance){
 }
 
 /*
-* adds one transaction row to the csv file
+* This function appends one transaction row to the CSV file using the
+* current local date and time.
+* @param (const char*) name is the account name.
+* @param (long) number is the account number.
+* @param (const char*) type is the transaction type ("deposit" or "withdrawal").
+* @param (double) amount is the transaction amount.
+* @param (double) balance is the resulting balance after the transaction.
+* @return (int) Returns 1 if the write succeeded, 0 otherwise.
 */
 int append_transaction(const char* name, long number, const char* type,
                        double amount, double balance){
@@ -631,8 +694,8 @@ int append_transaction(const char* name, long number, const char* type,
 * It asks for the account name, looks it up in the CSV, then shows
 * that account's number and balance before taking the deposit.
 * After updating the balance, it appends the transaction to the CSV.
-* @param (Account*) acct is a pointer to the user's Account struct
-* @param (double[]) rates is the exchange rates array (kept for compatibility)
+* @param (Account*) acct is a pointer to the user's Account struct.
+* @param (double[]) rates is the exchange rates array (kept for compatibility).
 * @return (void)
 */
 void depositAmount(Account* acct, double rates[]){
@@ -696,7 +759,7 @@ void depositAmount(Account* acct, double rates[]){
 * It asks for the account name, looks it up in the CSV, then shows
 * that account's number and balance before taking the withdrawal.
 * After updating the balance, it appends the transaction to the CSV.
-* @param (Account*) acct is a pointer to the user's Account struct
+* @param (Account*) acct is a pointer to the user's Account struct.
 * @return (void)
 */
 void withdrawAmount(Account* acct){
@@ -730,6 +793,7 @@ void withdrawAmount(Account* acct){
     printf("Current Balance: %.2f\n", balance);
     printf("Currency: PHP\n");
 
+    // validate the withdrawal amount against the current balance
     while(1){
         printf("Withdraw Amount: ");
         if(!readDouble(&withdraw)){
@@ -760,6 +824,8 @@ void withdrawAmount(Account* acct){
 
 /*
 * This function allows the user to record an exchange rate for a foreign currency.
+* It displays the list of currencies, validates the selection (PHP cannot be set),
+* and stores the rate in the rates array.
 * @param (double[]) rates is an array of size 6 storing the exchange rates relative to PHP.
 * @return (void)
 */
@@ -775,6 +841,7 @@ void recordExchangeRate(double rates[]){
     printf("[5] Euro (EUR)\n");
     printf("[6] Chinese Yuan Renminni (CNY)\n\n");
 
+    // validate the currency selection
     while(1){
         printf("Select Foreign Currency: ");
         if(!readInt(&choice)){
@@ -792,6 +859,7 @@ void recordExchangeRate(double rates[]){
         break;
     }
 
+    // validate the exchange rate
     while(1){
         printf("Exchange Rate: ");
         if(!readDouble(&rate)){
@@ -811,6 +879,8 @@ void recordExchangeRate(double rates[]){
 
 /*
 * This function performs currency exchange calculations.
+* It asks for the source and target currencies plus the amount, then converts
+* through PHP as the base currency. It loops if the user wants to convert again.
 * @param (double[]) rates is an array of size 6 storing the exchange rates relative to PHP.
 * @return (void)
 */
@@ -830,6 +900,7 @@ void currencyExchange(double rates[]){
         printf("[5] Euro (EUR)\n");
         printf("[6] Chinese Yuan Renminni (CNY)\n\n");
 
+        // validate the source currency
         while(1){
             printf("Source Currency: ");
             if(!readInt(&source)){
@@ -843,6 +914,7 @@ void currencyExchange(double rates[]){
             break;
         }
 
+        // validate the source amount
         while(1){
             printf("Source Amount: ");
             if(!readDouble(&amount)){
@@ -865,6 +937,7 @@ void currencyExchange(double rates[]){
         printf("[5] Euro (EUR)\n");
         printf("[6] Chinese Yuan Renminni (CNY)\n\n");
 
+        // validate the target currency
         while(1){
             printf("Exchange Currency: ");
             if(!readInt(&target)){
@@ -890,7 +963,7 @@ void currencyExchange(double rates[]){
             continue;
         }
 
-        // conversion of the amount
+        // conversion of the amount through PHP as the base currency
         double inPhp;
         if(source == 1){
             inPhp = amount;
@@ -914,7 +987,7 @@ void currencyExchange(double rates[]){
 * This function calculates and displays the expected daily interest over N days.
 * It displays the current account details, takes the number of days, and prints
 * a formatted table showing the day, interest earned, and running balance.
-* @param (Account*) acct is a pointer to the user's Account struct
+* @param (Account*) acct is a pointer to the user's Account struct.
 * @return (void)
 */
 void showInterestAmount(Account* acct){
@@ -932,6 +1005,7 @@ void showInterestAmount(Account* acct){
     printf("Currency: %s\n", CURRENCY_CODES[acct->currency]);
     printf("Interest Rate: 5%%\n\n");
 
+    // validate the number of days
     while(1){
         printf("Total Number of Days: ");
         if(!readInt(&days)){
@@ -953,6 +1027,7 @@ void showInterestAmount(Account* acct){
 
     printf("%-4s| %-9s| %-8s|\n", "Day", "Interest", "Balance");
 
+    // print the interest table with running balance
     double current = acct->balance;
     for(int i = 1; i <= days; i++){
         double interest = current * (ANNUAL_RATE / 365.0);
@@ -962,8 +1037,14 @@ void showInterestAmount(Account* acct){
     printf("\n");
 }
 
-//functions for the csv loader
-//loads back_transactions.csv
+/*
+* This function loads and validates transactions from the given CSV file.
+* It skips the header and blank lines, rejects malformed rows into the
+* invalid_rows counter, skips non-PHP rows into the non_php_rows counter,
+* and stores only valid PHP rows in a dynamically growing array.
+* @param (const char*) filename is the path to the CSV file.
+* @return (LoadResult) The populated load result with the transaction list and counters.
+*/
 LoadResult load_transactions(const char* filename){
     LoadResult r;
     r.list = NULL;
@@ -1046,6 +1127,9 @@ LoadResult load_transactions(const char* filename){
             r.invalid_rows++;
             continue;
         }
+        // store the raw time string
+        strncpy(t.time_str, fields[3], sizeof(t.time_str) - 1);
+        t.time_str[sizeof(t.time_str) - 1] = '\0';
 
         //currency
         if(strlen(fields[4]) == 0 || strlen(fields[4]) >= MAX_CURR){
@@ -1102,7 +1186,12 @@ LoadResult load_transactions(const char* filename){
     return r;
 }
 
-// js a helper func para ma free up ung loadresult
+/*
+* This function releases the dynamically allocated list inside a LoadResult
+* and resets the pointer to NULL to avoid double frees.
+* @param (LoadResult*) r is the load result to free.
+* @return (void)
+*/
 void free_load_result(LoadResult* r){
     if (r->list != NULL) {
         free(r->list);
@@ -1110,7 +1199,11 @@ void free_load_result(LoadResult* r){
     }
 }
 
-//removes trailing \n and \r from a string
+/*
+* This function removes trailing \n and \r characters from a string in place.
+* @param (char*) s is the string to trim.
+* @return (void)
+*/
 void strip_newline(char* s){
     int len = strlen(s);
     while(len > 0 && (s[len-1] == '\n' || s[len-1] == '\r')){
@@ -1119,7 +1212,14 @@ void strip_newline(char* s){
     }
 }
 
-//splits a line by commas
+/*
+* This function splits a line by commas into an array of field pointers.
+* It modifies the line in place by replacing commas with null terminators.
+* @param (char*) line is the line to split (modified in place).
+* @param (char*[]) fields is the output array of field pointers.
+* @param (int) max_fields is the maximum number of fields allowed.
+* @return (int) The number of fields found, or -1 if max_fields was exceeded.
+*/
 int split_line(char* line, char* fields[], int max_fields){
     int count = 0;
     char* p = line;
@@ -1141,7 +1241,13 @@ int split_line(char* line, char* fields[], int max_fields){
     return count;
 }
 
-//check if currency is php na case-insensitive js to make sure if not polished ung dataset given
+/*
+* This function checks whether a currency code is PHP (case-insensitive).
+* It is used to filter the dataset so only PHP transactions are kept,
+* even if the source CSV has inconsistent casing.
+* @param (const char*) s is the 3-letter currency code to check.
+* @return (int) Returns 1 if the code is PHP, 0 otherwise.
+*/
 int is_php(const char* s){
     if(strlen(s) != 3){
         return 0;
@@ -1160,10 +1266,99 @@ int is_php(const char* s){
     }
 
     return (a == 'P' && b == 'H' && c == 'P');
-
 }
 
-//functions for the reports
+/*
+* This function rounds a double to 2 decimal places.
+* @param (double) val is the value to round.
+* @return (double) The rounded value.
+*/
+double round2(double val){
+    return round(val * 100.0) / 100.0;
+}
+
+/*
+* This function formats a monetary value into a string with comma
+* thousands separators and exactly 2 decimal places.
+* @param (char*) out is the output buffer.
+* @param (int) out_size is the size of the output buffer.
+* @param (double) val is the value to format.
+* @return (void)
+*/
+void format_money(char* out, int out_size, double val){
+    double r = round2(val);
+    if(r > -0.005 && r < 0.005){
+        r = 0.0;
+    }
+
+    int neg = 0;
+    if(r < 0.0){
+        neg = 1;
+        r = -r;
+    }
+
+    long whole = (long)r;
+    int cents = (int)round((r - (double)whole) * 100.0);
+    if(cents == 100){
+        whole = whole + 1;
+        cents = 0;
+    }
+
+    char digits[64];
+    sprintf(digits, "%ld", whole);
+    int len = strlen(digits);
+
+    char with_commas[96];
+    int idx = 0;
+    int i;
+    for(i = 0; i < len; i++){
+        if(i > 0 && (len - i) % 3 == 0){
+            with_commas[idx] = ',';
+            idx++;
+        }
+        with_commas[idx] = digits[i];
+        idx++;
+    }
+    with_commas[idx] = '\0';
+
+    if(neg == 1){
+        snprintf(out, out_size, "-%s.%02d", with_commas, cents);
+    } else {
+        snprintf(out, out_size, "%s.%02d", with_commas, cents);
+    }
+}
+
+/*
+* This function converts a calendar date into a day count, which is
+* useful for computing account age and for comparing dates efficiently.
+* @param (int) day is the day of the month.
+* @param (int) month is the month (1-12).
+* @param (int) year is the four-digit year.
+* @return (long) The day count for the given date.
+*/
+long date_to_days(int day, int month, int year){
+    long y = (long)year;
+    if(month <= 2){
+        y -= 1;
+    }
+    long leap_days = (y / 4) - (y / 100) + (y / 400);
+    long total = (long)year * 365 + leap_days + day;
+
+    int m;
+    for(m = 1; m < month; m++){
+        total += days_in_month(m, year);
+    }
+    return total;
+}
+
+/*
+* This function displays the reports submenu.
+* It offers loading the dataset, generating all reports, or going back.
+* The loaded dataset is kept in a static variable so it can be reused
+* between menu iterations without reloading.
+* @param (void)
+* @return (void)
+*/
 void showReportsMenu(){
     static LoadResult data;
     static int loaded = 0;
@@ -1196,47 +1391,54 @@ void showReportsMenu(){
 
             printf("\nProcessing dataset...\n");
             data = load_transactions(CSV_FILE);
-            loaded = 1;
-
-            if(data.list == NULL || data.php_rows == 0){
-                printf("Error: Could not load %s\n\n", CSV_FILE);
-                loaded = 0;
+            if(data.list != NULL){
+                loaded = 1;
+                printf("Loaded %d PHP rows.\n\n", data.php_rows);
+            }
+        }
+        else if(choice == 2){
+            if(!loaded || data.list == NULL){
+                printf("Error: Please load the file first.\n\n");
                 continue;
             }
-
-            printf("%d rows loaded, %d filtered for PHP currency\n\n", data.total_rows, data.php_rows);
-        } else if (choice == 2){
-            if(!loaded){
-                printf("Error: Please load the file first (option 1). \n\n");
-                continue;
-            }
-            generateAllReports(&data, NULL);
-            printf("\n");
-        } else if(choice == 3){
-            if(loaded){
-                free_load_result(&data);
-                loaded = 0;
-            }
-            return;
-        } else {
-            printf("Error: Invalid choice. Please enter 1, 2, or 3.\n\n");
+            Account dummy;
+            dummy.balance = DEFAULT_BALANCE;
+            dummy.currency = PHP;
+            dummy.accountNumber = 0;
+            strcpy(dummy.accountName, "");
+            generateAllReports(&data, &dummy);
+        }
+        else if(choice == 3){
+            break;
+        }
+        else {
+            printf("Error: Invalid choice. Please enter 1 to 3.\n\n");
         }
     }
 }
 
+/*
+* This function generates all four reports and the summary JSON in order.
+* The account parameter is currently unused and is kept for API compatibility.
+* @param (LoadResult*) data is the loaded dataset.
+* @param (Account*) acct is the user's account (unused).
+* @return (void)
+*/
 void generateAllReports(LoadResult* data, Account* acct){
-    printf("Generating reports...\n");
-    printf("Outputs saved to individual files...\n\n");
-
+    (void)acct;
     report1_privelege_tiers(data);
     report2_interest_projection(data);
     report3_suspicious_behavior(data);
     report4_hourly_transaction(data);
     write_summary_json(data);
-
-    (void) acct;
 }
 
+/*
+* This function compares two calendar dates.
+* @param (int) d1, (int) m1, (int) y1 are the first date (day, month, year).
+* @param (int) d2, (int) m2, (int) y2 are the second date (day, month, year).
+* @return (int) Returns 1 if the first date is later, -1 if earlier, 0 if equal.
+*/
 int compare_date(int d1, int m1, int y1, int d2, int m2, int y2){
     if (y1 > y2) {
         return 1;
@@ -1255,11 +1457,34 @@ int compare_date(int d1, int m1, int y1, int d2, int m2, int y2){
     } else if (d1 < d2){
         return -1;
     } else {
-    return 0;
+        return 0;
     }
 }
 
-//to get number of days in a given month
+/*
+* This function compares two transactions by date first, then by raw time string using strcmp.
+* @param (int) d1, m1, y1 are the first date.
+* @param (const char*) t1 is the first raw time string.
+* @param (int) d2, m2, y2 are the second date.
+* @param (const char*) t2 is the second raw time string.
+* @return (int) Returns 1 if first > second, -1 if first < second, 0 if equal.
+*/
+int compare_datetime(int d1, int m1, int y1, const char* t1,
+                     int d2, int m2, int y2, const char* t2){
+    int date_cmp = compare_date(d1, m1, y1, d2, m2, y2);
+    if(date_cmp != 0){
+        return date_cmp;
+    }
+    return strcmp(t1, t2);
+}
+
+/*
+* This function returns the number of days in a given month.
+* It accounts for leap years using the standard Gregorian rules.
+* @param (int) month is the month (1-12).
+* @param (int) year is the four-digit year.
+* @return (int) The number of days in the given month.
+*/
 int days_in_month(int month, int year){
     if(month == 2){
         if(year % 4 == 0){
@@ -1282,64 +1507,62 @@ int days_in_month(int month, int year){
     return 31;
 }
 
-//compare adb descending
+/*
+* This function is the qsort comparator for Report 1.
+* It sorts accounts by average daily balance in descending order with no tiebreak.
+* @param (const void*) a is the first PrivilegeAccount.
+* @param (const void*) b is the second PrivilegeAccount.
+* @return (int) Negative if a should come first, positive if b should come first.
+*/
 int comp_adb_desc(const void* a, const void* b){
-    const  PrivilegeAccount* first = (const PrivilegeAccount*) a;
-    const  PrivilegeAccount* second = (const PrivilegeAccount*) b;
+    const PrivilegeAccount* first = (const PrivilegeAccount*) a;
+    const PrivilegeAccount* second = (const PrivilegeAccount*) b;
 
     if(first->avg_daily_balance < second->avg_daily_balance){
         return 1;
     } else if(first->avg_daily_balance > second->avg_daily_balance){
         return -1;
-    } else {
-    return 0;
     }
+    return 0;
 }
 
-
+/*
+* Report 1: Banking Privilege Tiers.
+* @param (LoadResult*) data is the loaded dataset.
+* @return (void)
+*/
 void report1_privelege_tiers(LoadResult* data){
     int i, j;
     printf("Report 1: Banking Privelege Tiers\n");
 
-    //to identify last month
+    if(data == NULL || data->php_rows <= 0){
+        printf("Error: No data loaded.\n\n");
+        return;
+    }
+
     time_t current_time = time(NULL);
     struct tm* current_date = localtime(&current_time);
 
-    int report_month = current_date->tm_mon;
-    int report_year = current_date->tm_year + 1900;
+    int today_day = current_date->tm_mday;
+    int today_month = current_date->tm_mon + 1;
+    int today_year = current_date->tm_year + 1900;
+    long today_days = date_to_days(today_day, today_month, today_year);
 
+    //to identify last month
+    int report_month = current_date->tm_mon;
+    int report_year = today_year;
     if(report_month == 0){
         report_month = 12;
         report_year = report_year - 1;
     }
-    
+
     int days_in_report = days_in_month(report_month, report_year);
-
-    int latest_day = 0;
-    int latest_month = 0;
-    int latest_year = 0;
-
-    for(i = 0; i < data->php_rows; i++){
-        Transaction* transaction = &data->list[i];
-        int cmp = compare_date(transaction->day, transaction->month, transaction->year, 
-            latest_day, latest_month, latest_year);
-
-        if (cmp >= 0){
-            latest_day = transaction->day;
-            latest_month = transaction->month;
-            latest_year = transaction->year;
-        }
-    }
-    if(latest_year == 0){
-        printf("Error: No data loaded.\n\n");
-        return;
-    }
 
     //for acc num distinction
     long acc_numbers[5000];
     int acc_count = 0;
 
-    for(i=0; i < data->php_rows; i++){
+    for(i = 0; i < data->php_rows; i++){
         long current_number = data->list[i].account_number;
         int alr_seen = 0;
         for(j = 0; j < acc_count; j++){
@@ -1362,22 +1585,33 @@ void report1_privelege_tiers(LoadResult* data){
     for(i = 0; i < acc_count; i++){
         long this_acc = acc_numbers[i];
 
-        //name, first transac date, latest balance niya
+        //name, first transac date
         char acc_name[MAX_NAME] = "";
+        int have_name = 0;
         int first_day = 0;
         int first_month = 0;
         int first_year = 0;
-        double curr_balance = 0.0;
         int have_first_transaction = 0;
+
+        // collect indices of this account's rows for sorting by (date, time_str)
+        int acc_indices[10000];
+        int acc_idx_count = 0;
 
         for(j = 0; j < data->php_rows; j++){
             Transaction* transaction = &data->list[j];
             if(transaction->account_number != this_acc){
                 continue;
             }
-            
-            strcpy(acc_name, transaction->account_name);
-            curr_balance = transaction->current_balance;
+
+            if(acc_idx_count < 10000){
+                acc_indices[acc_idx_count] = j;
+                acc_idx_count++;
+            }
+
+            if(!have_name){
+                strcpy(acc_name, transaction->account_name);
+                have_name = 1;
+            }
 
             if(have_first_transaction == 0){
                 first_day = transaction->day;
@@ -1385,8 +1619,7 @@ void report1_privelege_tiers(LoadResult* data){
                 first_year = transaction->year;
                 have_first_transaction = 1;
             } else {
-                int cmp = compare_date(transaction->day, transaction->month, transaction->year, 
-            first_day, first_month, first_year);
+                int cmp = compare_date(transaction->day, transaction->month, transaction->year, first_day, first_month, first_year);
 
                 if(cmp < 0){
                     first_day = transaction->day;
@@ -1396,58 +1629,53 @@ void report1_privelege_tiers(LoadResult* data){
             }
         }
 
+        if(!have_first_transaction){
+            continue;
+        }
+
         //age ng account in days
-        int acc_age_days = 0;
-        long first_transac = (long)first_year * 365;
-        first_transac = first_transac + (first_year / 4);
-        for(int k=1; k < first_month; k++){
-            first_transac = first_transac + days_in_month(k, first_year);
+        long first_days = date_to_days(first_day, first_month, first_year);
+        int acc_age_days = (int)(today_days - first_days);
+
+        // sort this account's transaction indices by (date, time_str) ascending
+        for(int a = 0; a < acc_idx_count - 1; a++){
+            for(int b = 0; b < acc_idx_count - 1 - a; b++){
+                Transaction* t1 = &data->list[acc_indices[b]];
+                Transaction* t2 = &data->list[acc_indices[b + 1]];
+                int cmp = compare_datetime(t1->day, t1->month, t1->year, t1->time_str, t2->day, t2->month, t2->year, t2->time_str);
+                if(cmp > 0){
+                    int tmp = acc_indices[b];
+                    acc_indices[b] = acc_indices[b + 1];
+                    acc_indices[b + 1] = tmp;
+                }
+            }
         }
-        first_transac = first_transac + first_day;
 
-        long latest_transac = (long)latest_year * 365;
-        latest_transac = latest_transac + (latest_year / 4);
-        for(int k=1; k < latest_month; k++){
-            latest_transac = latest_transac + days_in_month(k, latest_year);
+        // current balance = balance of latest transaction by (date, time_str)
+        double final_current_balance = 0.0;
+        if(acc_idx_count > 0){
+            final_current_balance = data->list[acc_indices[acc_idx_count - 1]].current_balance;
         }
-        latest_transac = latest_transac + latest_day;
 
-        acc_age_days = (int)(latest_transac - first_transac);
-
-        //average daily balance(adb)
-        double end_day_balance = 0.0;
+        //for each day, EOD = latest transaction's balance with date <= that day
         double total_eod_balances = 0.0;
 
-        for(int day = 1; day <= days_in_report; day++){
-            int found_transaction_today = 0;
-            double last_balance_of_the_day = 0.0;
-
-        for(j = 0; j < data->php_rows; j++){
-            Transaction* transaction = &data->list[j];
-            if(transaction->account_number != this_acc){
-                continue;
+        int day;
+        for(day = 1; day <= days_in_report; day++){
+            double end_of_day_balance = 0.0;
+            for(int k = 0; k < acc_idx_count; k++){
+                Transaction* t = &data->list[acc_indices[k]];
+                if(compare_date(t->day, t->month, t->year,
+                                day, report_month, report_year) <= 0){
+                    end_of_day_balance = t->current_balance;   // last one wins = latest by datetime
+                } else {
+                    break;   // sorted ascending, so we can stop early
+                }
             }
-            if(transaction->day != day){
-                continue;
-            }
-            if(transaction->month != report_month){
-                continue;
-            }
-            if(transaction->year != report_year){
-                continue;
-            }
-            last_balance_of_the_day = transaction->current_balance;
-            found_transaction_today = 1;
-        }
-        
-        if(found_transaction_today == 1){
-            end_day_balance = last_balance_of_the_day;
+            total_eod_balances = total_eod_balances + end_of_day_balance;
         }
 
-        total_eod_balances = total_eod_balances + end_day_balance;
-    }
-
-    double avg_daily_balance = total_eod_balances / (double)days_in_report;
+        double avg_daily_balance = total_eod_balances / (double)days_in_report;
 
         if(avg_daily_balance < 100000.0){
             continue;
@@ -1457,7 +1685,7 @@ void report1_privelege_tiers(LoadResult* data){
         strcpy(account_row.acc_name, acc_name);
         account_row.acc_num = this_acc;
         account_row.acc_age_days = acc_age_days;
-        account_row.current_balance = curr_balance;
+        account_row.current_balance = final_current_balance;
         account_row.avg_daily_balance = avg_daily_balance;
 
         if(avg_daily_balance >= 1000000.0){
@@ -1468,8 +1696,10 @@ void report1_privelege_tiers(LoadResult* data){
             strcpy(account_row.privilege_tier, "Silver");
         }
 
-        results[result_count] = account_row;
-        result_count++;
+        if(result_count < 5000){
+            results[result_count] = account_row;
+            result_count++;
+        }
     }
 
     qsort(results, result_count, sizeof(PrivilegeAccount), comp_adb_desc);
@@ -1481,24 +1711,38 @@ void report1_privelege_tiers(LoadResult* data){
     }
 
     fprintf(output_file, "AccountName,AccountAge,CurrentBalance,AverageDailyBalance,PrivilegeTier\n");
+    char cur_bal_str[64], adb_str[64];
     for(i = 0; i < result_count; i++){
-        fprintf(output_file, "%s,%d,%.2f,%.2f,%s\n", results[i].acc_name, results[i].acc_age_days, results[i].current_balance,
-                results[i].avg_daily_balance, results[i].privilege_tier);
+        format_money(cur_bal_str, sizeof(cur_bal_str), results[i].current_balance);
+        format_money(adb_str, sizeof(adb_str), results[i].avg_daily_balance);
+        fprintf(output_file, "%s,%d,\"%s\",\"%s\",%s\n", results[i].acc_name, results[i].acc_age_days,
+                cur_bal_str, adb_str, results[i].privilege_tier);
     }
     fclose(output_file);
 
-    printf("AccountName | AccountAge | CurrentBalance | AverageDailyBalance | PrivilegeTier\n");
+    printf("%-20s | %-10s | %-18s | %-20s | %s\n",
+           "AccountName", "AccountAge", "CurrentBalance", "AverageDailyBalance", "PrivilegeTier");
     for(i = 0; i < result_count; i++){
         if(i >= 2){
             break;
         }
-        printf("%s | %d | %.2f | %.2f | %s\n", results[i].acc_name, results[i].acc_age_days, results[i].current_balance,
-               results[i].avg_daily_balance, results[i].privilege_tier);
+        char cur_bal_str2[64], adb_str2[64];
+        format_money(cur_bal_str2, sizeof(cur_bal_str2), results[i].current_balance);
+        format_money(adb_str2, sizeof(adb_str2), results[i].avg_daily_balance);
+        printf("%-20s | %-10d | %-18s | %-20s | %s\n", results[i].acc_name, results[i].acc_age_days,
+               cur_bal_str2, adb_str2, results[i].privilege_tier);
     }
     printf("(%d rows written to report1_banking_privilege_tiers.csv)\n\n", result_count);
 }
 
-//sort descending by expected interest
+/*
+* This function is the qsort comparator for Report 2.
+* It sorts rows by expected interest in descending order, then by
+* account name ascending as a tiebreak.
+* @param (const void*) a is the first InterestRow.
+* @param (const void*) b is the second InterestRow.
+* @return (int) Negative if a should come first, positive if b should come first.
+*/
 int comp_interest_desc(const void* a, const void* b){
     const InterestRow* first = (const InterestRow*)a;
     const InterestRow* second = (const InterestRow*)b;
@@ -1507,10 +1751,15 @@ int comp_interest_desc(const void* a, const void* b){
     } else if(first->expected_interest > second->expected_interest){
         return -1;
     } else {
-        return 0;
+        return strcmp(first->name, second->name);
     }
 }
 
+/*
+* Report 2: Interest Expense Projection.
+* @param (LoadResult*) data is the loaded dataset.
+* @return (void)
+*/
 void report2_interest_projection(LoadResult* data){
     int i, j;
     printf("Report 2: Interest Expense Projection\n");
@@ -1563,15 +1812,17 @@ void report2_interest_projection(LoadResult* data){
         // for the 30 day interest
         double daily_rate = ANNUAL_RATE / 365.0;
         double daily_interest = current_balance * daily_rate;
-        double expected_interest = daily_interest * 30.0;
+        double expected_interest = round2(daily_interest * 30.0);
 
         InterestRow row;
         strcpy(row.name, acc_name);
         row.current_balance = current_balance;
         row.expected_interest = expected_interest;
 
-        results[result_count] = row;
-        result_count++;
+        if(result_count < 5000){
+            results[result_count] = row;
+            result_count++;
+        }
     }
 
     qsort(results, result_count, sizeof(InterestRow), comp_interest_desc);
@@ -1583,24 +1834,37 @@ void report2_interest_projection(LoadResult* data){
     }
 
     fprintf(output_file, "AccountName,CurrentBalance,ExpectedInterest\n");
+    char cur_bal_str[64], exp_int_str[64];
     for(i = 0; i < result_count; i++){
-        fprintf(output_file, "%s,%.2f,%.2f\n", results[i].name, results[i].current_balance, results[i].expected_interest);
+        format_money(cur_bal_str, sizeof(cur_bal_str), results[i].current_balance);
+        format_money(exp_int_str, sizeof(exp_int_str), results[i].expected_interest);
+        fprintf(output_file, "%s,\"%s\",\"%s\"\n", results[i].name, cur_bal_str, exp_int_str);
     }
     fclose(output_file);
 
     // first 2 rows
-    printf("AccountName | CurrentBalance | ExpectedInterest\n");
+    printf("%-20s | %-18s | %s\n", "AccountName", "CurrentBalance", "ExpectedInterest");
     for(i = 0; i < result_count; i++){
         if(i >= 2){
             break;
         }
-        printf("%s | %.2f | %.2f\n", results[i].name, results[i].current_balance, results[i].expected_interest);
+        char cur_bal_str2[64], exp_int_str2[64];
+        format_money(cur_bal_str2, sizeof(cur_bal_str2), results[i].current_balance);
+        format_money(exp_int_str2, sizeof(exp_int_str2), results[i].expected_interest);
+        printf("%-20s | %-18s | %s\n", results[i].name, cur_bal_str2, exp_int_str2);
     }
     printf("(%d rows written to report2_interest_expense_projection.csv)\n\n", result_count);
 
 }
 
-//sort by date ascending then risk flag descending
+/*
+* This function is the qsort comparator for Report 3.
+* It sorts rows by date ascending, then by risk flag (Suspicious first),
+* then by original insertion index to emulate stable sort.
+* @param (const void*) a is the first DailySummary.
+* @param (const void*) b is the second DailySummary.
+* @return (int) Negative if a should come first, positive if b should come first.
+*/
 int comp_daily(const void* a, const void* b){
     const DailySummary* first  = (const DailySummary*)a;
     const DailySummary* second = (const DailySummary*)b;
@@ -1611,7 +1875,7 @@ int comp_daily(const void* a, const void* b){
         return date_cmp;
     }
 
-    // same date: Suspicious first
+    // same date then Suspicious first
     int first_suspicious = 0;
     int second_suspicious = 0;
     if(strcmp(first->risk_flag, "Suspicious") == 0){
@@ -1625,50 +1889,61 @@ int comp_daily(const void* a, const void* b){
         return -1;
     } else if(first_suspicious < second_suspicious){
         return 1;
-    } else {
-        return 0;
     }
+
+    // stable tiebreak then original insertion order
+    if(first->orig_index < second->orig_index) return -1;
+    if(first->orig_index > second->orig_index) return 1;
+    return 0;
 }
 
+/*
+* Report 3: Suspicious Client Behavior.
+* @param (LoadResult*) data is the loaded dataset.
+* @return (void)
+*/
 void report3_suspicious_behavior(LoadResult* data){
     int i, j;
     printf("Report 3: Suspicious Client Behavior\n");
 
+    if(data == NULL || data->php_rows <= 0){
+        printf("Error: No data loaded.\n\n");
+        return;
+    }
+
     DailySummary results[20000];
     int result_count = 0;
 
-    // group transactions by (account, date)
+    // single pass through transactions in CSV order
     for(i = 0; i < data->php_rows; i++){
-        Transaction* transaction = &data->list[i];
+        Transaction* tx = &data->list[i];
 
-        // find matching (account, date) entry in results
+        // find existing (account, date) entry
         int found_index = -1;
         for(j = 0; j < result_count; j++){
-            if(results[j].acc_num == transaction->account_number){
-                if(results[j].day == transaction->day){
-                    if(results[j].month == transaction->month){
-                        if(results[j].year == transaction->year){
-                            found_index = j;
-                            break;
-                        }
-                    }
-                }
+            if(results[j].acc_num == tx->account_number &&
+               results[j].day == tx->day &&
+               results[j].month == tx->month &&
+               results[j].year == tx->year){
+                found_index = j;
+                break;
             }
         }
 
         // create a new entry if not found
         if(found_index == -1){
             if(result_count < 20000){
-                strcpy(results[result_count].name, transaction->account_name);
-                results[result_count].acc_num = transaction->account_number;
-                results[result_count].day = transaction->day;
-                results[result_count].month = transaction->month;
-                results[result_count].year = transaction->year;
+                strcpy(results[result_count].name, tx->account_name);
+                results[result_count].acc_num = tx->account_number;
+                results[result_count].day = tx->day;
+                results[result_count].month = tx->month;
+                results[result_count].year = tx->year;
                 results[result_count].total_withdrawals = 0.0;
                 results[result_count].num_deposits = 0;
                 results[result_count].total_deposits = 0.0;
                 results[result_count].turnover_velocity = 0.0;
                 strcpy(results[result_count].risk_flag, "Normal");
+                results[result_count].orig_index = result_count;
                 found_index = result_count;
                 result_count++;
             } else {
@@ -1677,11 +1952,11 @@ void report3_suspicious_behavior(LoadResult* data){
         }
 
         // add to the group
-        if(strcmp(transaction->type, "withdrawal") == 0){
-            results[found_index].total_withdrawals += transaction->amount;
-        } else if(strcmp(transaction->type, "deposit") == 0){
+        if(strcmp(tx->type, "withdrawal") == 0){
+            results[found_index].total_withdrawals += tx->amount;
+        } else if(strcmp(tx->type, "deposit") == 0){
             results[found_index].num_deposits += 1;
-            results[found_index].total_deposits += transaction->amount;
+            results[found_index].total_deposits += tx->amount;
         }
     }
 
@@ -1691,7 +1966,7 @@ void report3_suspicious_behavior(LoadResult* data){
             results[i].turnover_velocity =
                 (results[i].total_withdrawals / results[i].total_deposits) * 100.0;
         } else {
-            results[i].turnover_velocity = 0.0;   
+            results[i].turnover_velocity = 0.0;
         }
 
         int is_suspicious = 0;
@@ -1718,40 +1993,40 @@ void report3_suspicious_behavior(LoadResult* data){
     }
 
     fprintf(output_file, "AccountName,Date,TotalWithdrawals,NumDeposits,TotalDeposits,TurnoverVelocity,RiskFlag\n");
+    char w_str[64], d_str[64], v_str[64];
     for(i = 0; i < result_count; i++){
-        fprintf(output_file, "%s,%02d/%02d/%04d,%.2f,%d,%.2f,%.2f,%s\n",
-                results[i].name,
-                results[i].day,
-                results[i].month,
-                results[i].year,
-                results[i].total_withdrawals,
-                results[i].num_deposits,
-                results[i].total_deposits,
-                results[i].turnover_velocity,
-                results[i].risk_flag);
+        format_money(w_str, sizeof(w_str), results[i].total_withdrawals);
+        format_money(d_str, sizeof(d_str), results[i].total_deposits);
+        format_money(v_str, sizeof(v_str), results[i].turnover_velocity);
+        fprintf(output_file, "%s,%02d/%02d/%04d,\"%s\",%d,\"%s\",\"%s\",%s\n", results[i].name, results[i].day, results[i].month, results[i].year,
+                w_str, results[i].num_deposits, d_str, v_str, results[i].risk_flag);
     }
     fclose(output_file);
 
     // first 2 rows
-    printf("AccountName | Date | TotalWithdrawals | NumDeposits | TotalDeposits | TurnoverVelocity | RiskFlag\n");
+    printf("%-20s | %-10s | %-18s | %-11s | %-16s | %-16s | %s\n",
+           "AccountName", "Date", "TotalWithdrawals", "NumDeposits",
+           "TotalDeposits", "TurnoverVelocity", "RiskFlag");
     for(i = 0; i < result_count; i++){
         if(i >= 2){
             break;
         }
-        printf("%s | %02d/%02d/%04d | %.2f | %d | %.2f | %.2f | %s\n",
-               results[i].name,
-               results[i].day,
-               results[i].month,
-               results[i].year,
-               results[i].total_withdrawals,
-               results[i].num_deposits,
-               results[i].total_deposits,
-               results[i].turnover_velocity,
+        char w_str2[64], d_str2[64], v_str2[64];
+        format_money(w_str2, sizeof(w_str2), results[i].total_withdrawals);
+        format_money(d_str2, sizeof(d_str2), results[i].total_deposits);
+        format_money(v_str2, sizeof(v_str2), results[i].turnover_velocity);
+        printf("%-20s | %02d/%02d/%04d | %-18s | %-11d | %-16s | %-16s | %s\n", results[i].name, results[i].day, results[i].month, results[i].year,
+               w_str2, results[i].num_deposits, d_str2, v_str2,
                results[i].risk_flag);
     }
     printf("(%d rows written to report3_suspicious_client_behavior.csv)\n\n", result_count);
 }
 
+/*
+* Report 4: Hourly Transaction Report.
+* @param (LoadResult*) data is the loaded dataset.
+* @return (void)
+*/
 void report4_hourly_transaction(LoadResult* data){
     int i;
     printf("Report 4: Hourly Transaction Report\n");
@@ -1797,21 +2072,31 @@ void report4_hourly_transaction(LoadResult* data){
     }
 
     fprintf(output_file, "Hour,TransactionCount,TotalAmount,AverageAmount\n");
+    char tot_str[64], avg_str[64];
     for(i = 0; i < 24; i++){
-        fprintf(output_file, "%02d:00,%d,%.2f,%.2f\n",
-                i, counts[i], totals[i], averages[i]);
+        format_money(tot_str, sizeof(tot_str), totals[i]);
+        format_money(avg_str, sizeof(avg_str), averages[i]);
+        fprintf(output_file, "%02d:00,%d,\"%s\",\"%s\"\n", i, counts[i], tot_str, avg_str);
     }
     fclose(output_file);
 
     // first 2 rows
-    printf("Hour | TransactionCount | TotalAmount | AverageAmount\n");
+    printf("%-6s | %-16s | %-14s | %s\n",
+           "Hour", "TransactionCount", "TotalAmount", "AverageAmount");
     for(i = 0; i < 2; i++){
-        printf("%02d:00 | %d | %.2f | %.2f\n",
-               i, counts[i], totals[i], averages[i]);
+        char tot_str2[64], avg_str2[64];
+        format_money(tot_str2, sizeof(tot_str2), totals[i]);
+        format_money(avg_str2, sizeof(avg_str2), averages[i]);
+        printf("%02d:00  | %-16d | %-14s | %s\n", i, counts[i], tot_str2, avg_str2);
     }
     printf("(24 rows written to report4_hourly_transaction_report.csv)\n\n");
 }
 
+/*
+* This function writes the summary JSON in multi-line format.
+* @param (LoadResult*) data is the loaded dataset.
+* @return (void)
+*/
 void write_summary_json(LoadResult* data){
     int i, j;
     printf("Summary State (summary.json):\n");
@@ -1858,7 +2143,6 @@ void write_summary_json(LoadResult* data){
         long this_acc = acc_numbers[i];
         double latest_balance = 0.0;
 
-        // find latest balance for this account
         for(j = 0; j < data->php_rows; j++){
             Transaction* transaction = &data->list[j];
             if(transaction->account_number != this_acc){
@@ -1869,29 +2153,45 @@ void write_summary_json(LoadResult* data){
 
         total_balance = total_balance + latest_balance;
 
-        // only count interest for accounts >= 10,000 
         if(latest_balance >= 10000.0){
             double daily_rate = ANNUAL_RATE / 365.0;
             double daily_interest = latest_balance * daily_rate;
-            double expected_interest = daily_interest * 30.0;
+            double expected_interest = round2(daily_interest * 30.0);
             total_interest_expense = total_interest_expense + expected_interest;
         }
     }
 
-    // write JSON file
+    // round before printing so json shows exactly 2 decimals
+    total_deposits = round2(total_deposits);
+    total_withdrawals = round2(total_withdrawals);
+    total_balance = round2(total_balance);
+    total_interest_expense = round2(total_interest_expense);
+
+    // write JSON file 
     FILE* output_file = fopen("summary.json", "w");
     if(output_file == NULL){
         printf("Error: Cannot write summary.json\n\n");
         return;
     }
 
-    fprintf(output_file,
-        "{\"total_accounts\": %d, \"total_deposits\": %.2f, \"total_withdrawals\": %.2f, \"total_balance\": %.2f, \"total_interest_expense\": %.2f}\n",
-        acc_count, total_deposits, total_withdrawals, total_balance, total_interest_expense);
+    fprintf(output_file, "{\"total_accounts\": %d, \n", acc_count);
+    fprintf(output_file, "  \"total_deposits\": %.2f, \n", total_deposits);
+    fprintf(output_file, "  \"total_withdrawals\": %.2f, \n", total_withdrawals);
+    fprintf(output_file, "  \"total_balance\": %.2f, \n", total_balance);
+    fprintf(output_file, "  \"total_interest_expense\": %.2f}\n", total_interest_expense);
 
     fclose(output_file);
 
     // preview
-    printf("{\"total_accounts\": %d, \"total_deposits\": %.2f, \"total_withdrawals\": %.2f, \"total_balance\": %.2f, \"total_interest_expense\": %.2f}\n\n",
-        acc_count, total_deposits, total_withdrawals, total_balance, total_interest_expense);
+    char dep_str[64], wd_str[64], bal_str[64], int_str[64];
+    format_money(dep_str, sizeof(dep_str), total_deposits);
+    format_money(wd_str, sizeof(wd_str), total_withdrawals);
+    format_money(bal_str, sizeof(bal_str), total_balance);
+    format_money(int_str, sizeof(int_str), total_interest_expense);
+
+    printf("{\"total_accounts\": %d,\n", acc_count);
+    printf("  \"total_deposits\": \"%s\",\n", dep_str);
+    printf("  \"total_withdrawals\": \"%s\",\n", wd_str);
+    printf("  \"total_balance\": \"%s\",\n", bal_str);
+    printf("  \"total_interest_expense\": \"%s\"}\n\n", int_str);
 }
