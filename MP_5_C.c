@@ -2016,8 +2016,7 @@ void report3_suspicious_behavior(LoadResult* data){
         format_money(d_str2, sizeof(d_str2), results[i].total_deposits);
         format_money(v_str2, sizeof(v_str2), results[i].turnover_velocity);
         printf("%-20s | %02d/%02d/%04d | %-18s | %-11d | %-16s | %-16s | %s\n", results[i].name, results[i].day, results[i].month, results[i].year,
-               w_str2, results[i].num_deposits, d_str2, v_str2,
-               results[i].risk_flag);
+               w_str2, results[i].num_deposits, d_str2, v_str2, results[i].risk_flag);
     }
     printf("(%d rows written to report3_suspicious_client_behavior.csv)\n\n", result_count);
 }
